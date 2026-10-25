@@ -1,0 +1,21 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
+  "minimumReleaseAge": "3 days",
+  "lockFileMaintenance": { "enabled": true, "schedule": ["before 6am on monday"] },
+  "packageRules": [
+    {
+      "description": "openapi-ts packages move together and are the runtime contract (peer ranges, the patched helpers); review them as one PR",
+      "matchPackageNames": ["openapi-typescript", "openapi-fetch", "openapi-react-query", "openapi-typescript-helpers"],
+      "groupName": "openapi-ts",
+      "automerge": false
+    },
+    { "matchDepTypes": ["peerDependencies"], "rangeStrategy": "widen" },
+    { "matchUpdateTypes": ["minor", "patch"], "matchDepTypes": ["devDependencies"], "groupName": "dev dependencies", "automerge": true },
+    {
+      "description": "oasdiff is the breaking-change gate; MIN_OASDIFF_VERSION in codegen/breaking.ts must stay compatible",
+      "matchPackageNames": ["oasdiff/oasdiff"],
+      "automerge": false
+    }
+  ]
+}
