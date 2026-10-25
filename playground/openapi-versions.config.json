@@ -1,0 +1,7 @@
+{
+  "$schema": "../openapi-versions.schema.json",
+  "specsDir": "playground/specs",
+  "outDir": "playground/generated",
+  "majors": { "1": { "floor": "1.3.0" } },
+  "runtimeImport": "../../../src/index"
+}

@@ -1,0 +1,5 @@
+{
+  "specsDir": "test/fixtures/broken",
+  "outDir": "/tmp/openapi-versions-broken-out",
+  "majors": { "1": { "floor": "1.6.0" } }
+}

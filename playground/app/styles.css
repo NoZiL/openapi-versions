@@ -1,0 +1,107 @@
+:root {
+  font-family: system-ui, sans-serif;
+  color: #1a1a1a;
+}
+body {
+  margin: 0;
+  background: #f4f5f7;
+}
+.layout {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 24px;
+  display: grid;
+  gap: 20px;
+}
+.panel {
+  background: #fff;
+  border: 1px solid #dcdfe4;
+  border-radius: 10px;
+  padding: 16px 20px;
+}
+.panel h2 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #5b6573;
+}
+.versions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+button {
+  font: inherit;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #b8bec8;
+  background: #fff;
+  cursor: pointer;
+}
+button:hover {
+  background: #eef1f5;
+}
+button.active {
+  background: #1f4fd8;
+  border-color: #1f4fd8;
+  color: #fff;
+}
+.banner {
+  background: #fff4d6;
+  border: 1px solid #e6c15a;
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+.blocked {
+  background: #fde8e8;
+  border: 1px solid #e08a8a;
+  padding: 16px;
+  border-radius: 8px;
+}
+.card h1 {
+  margin: 0 0 6px;
+  font-size: 22px;
+}
+.pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #e6f4ea;
+  font-size: 12px;
+  margin-left: 6px;
+}
+.pill.unknown {
+  background: #ede4fb;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 0;
+}
+.muted {
+  color: #6b7380;
+  font-size: 13px;
+}
+.hidden-feature {
+  color: #8a919c;
+  font-style: italic;
+}
+pre {
+  background: #101418;
+  color: #cfe3ff;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  max-height: 180px;
+  overflow: auto;
+  margin: 0;
+}
+img.avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: #dde;
+}

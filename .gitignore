@@ -1,0 +1,6 @@
+node_modules/
+dist/
+playground/generated/
+test/fixtures/generated/
+*.tsbuildinfo
+.DS_Store
