@@ -19,7 +19,7 @@
     "changeset": "changeset",
     "release": "pnpm build && changeset publish"
   },
-  "license": "UNLICENSED",
+  "license": "MIT",
   "devDependencies": {
     "@testing-library/react": "^16.3.3",
     "@types/node": "^26.6.5",

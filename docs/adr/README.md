@@ -10,3 +10,4 @@ One file per decision, `NNNN-title.md`, [MADR](https://adr.github.io/madr/) styl
 | [0004](0004-oasdiff-breaking-gate.md) | oasdiff gates every consecutive spec pair | accepted |
 | [0005](0005-patch-openapi-typescript-helpers.md) | Patch `openapi-typescript-helpers` until upstream ships the fix | accepted |
 | [0006](0006-tooling-mise-pnpm-biome.md) | mise, pnpm, Biome, Vitest, Changesets, Renovate; no turbo yet | accepted |
+| [0007](0007-mit-license.md) | MIT license | accepted |
