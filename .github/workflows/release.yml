@@ -5,16 +5,23 @@ on:
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
+# Writes go through the nozil-release-bot GitHub App token below, not GITHUB_TOKEN.
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
   id-token: write # npm provenance
 
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/create-github-app-token@v2
+        id: app
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.APP_PRIVATE_KEY }}
       - uses: actions/checkout@v5
+        with:
+          token: ${{ steps.app.outputs.token }} # pushes and tags are made by the bot, so CI runs on the release PR
       - uses: jdx/mise-action@v3
       - run: pnpm install --frozen-lockfile
       - uses: changesets/action@v1
@@ -22,6 +29,6 @@ jobs:
           publish: pnpm release
           version: pnpm changeset version
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app.outputs.token }}
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: "true"
