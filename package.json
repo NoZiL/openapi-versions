@@ -1,6 +1,6 @@
 {
   "name": "openapi-versions",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Multi-version OpenAPI client for the openapi-ts ecosystem: merges the minor specs of one API major, generates tolerant types with openapi-typescript, and gates features at runtime.",
   "scripts": {
     "codegen:playground": "rm -rf playground/generated && tsx codegen/cli.ts --config playground/openapi-versions.config.json",
