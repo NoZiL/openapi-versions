@@ -17,9 +17,9 @@ mise install && pnpm install
 # (use --require-gate or "gate": "required" in CI): https://github.com/oasdiff/oasdiff/releases
 pnpm codegen         # check + merge + generate for playground/ and test/fixtures/ (output is gitignored)
 pnpm typecheck       # includes compile-time guarantees in test/types.check.ts
-npm test                # 34 tests: merge, since maps, oasdiff gate, compat matrix, React, loaders, major transition
+pnpm test           # 41 tests: merge, since maps, oasdiff gate, compat matrix, React, loaders, major transition
 pnpm playground:api  # one client build vs backends 1.2.0 … 2.0.0
-npx tsx codegen/cli.ts --check-only --config test/fixtures/broken.config.json   # shows the CI gate failing
+pnpm exec tsx codegen/cli.ts --check-only --config test/fixtures/broken.config.json   # shows the CI gate failing
 ```
 
 ## How it works

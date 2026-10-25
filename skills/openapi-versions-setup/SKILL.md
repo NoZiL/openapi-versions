@@ -20,7 +20,7 @@ Read `docs/concepts.md` once if the vocabulary (major, minor, floor, gated) is u
 5. **Install**: `npm i openapi-versions openapi-fetch openapi-react-query @tanstack/react-query` and `npm i -D openapi-typescript "typescript@<7"`; apply the `openapi-typescript-helpers` patch from `patches/` (patch-package).
    Import everything from the generated `<outDir>/v<n>/client.ts` (`ApiVersionProvider`, `useApi`, `Feature`, `createApi`, `Paths`); the major appears only in that import path.
 6. **Provider**: wrap the app in `QueryClientProvider` then `<ApiVersionProvider baseUrl="https://host/api/v<n>">`. The base URL must include the major prefix; `/version` is read relative to it.
-7. **Verify**: `pnpm typecheck && npm test`; for a visual check `pnpm playground`.
+7. **Verify**: `pnpm typecheck && pnpm test`; for a visual check `pnpm playground`.
 
 ## Backend prerequisites (confirm, do not assume)
 

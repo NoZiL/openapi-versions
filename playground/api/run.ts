@@ -1,6 +1,6 @@
 /**
  * Framework-free walkthrough: one client build (specs 1.3.0–1.6.0, major 1)
- * against backends at different versions. Run: npm run demo
+ * against backends at different versions. Run: pnpm playground:api
  */
 
 import { majors } from "../generated";

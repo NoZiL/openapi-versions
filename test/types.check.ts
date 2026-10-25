@@ -1,5 +1,5 @@
 /**
- * Compile-time guarantees. Checked by `npm run typecheck` (tsc), never executed.
+ * Compile-time guarantees. Checked by `pnpm typecheck` (tsc), never executed.
  * Each @ts-expect-error FAILS the typecheck if the line stops being an error.
  */
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";

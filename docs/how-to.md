@@ -1,6 +1,6 @@
 # How-to
 
-Each recipe lists the exact steps. Run `pnpm codegen`, `pnpm typecheck` and `npm test` after changes.
+Each recipe lists the exact steps. Run `pnpm codegen`, `pnpm typecheck` and `pnpm test` after changes.
 - [Add the spec of a new backend release](#add-the-spec-of-a-new-backend-release)
 - [Use a feature before the backend ships it](#use-a-feature-before-the-backend-ships-it)
 - [Gate a query, a mutation, a field](#gate-a-query-a-mutation-a-field)
@@ -149,7 +149,7 @@ Client CI:
 npm ci
 pnpm codegen        # fails on a breaking pair, bad config, or missing floor spec
 git diff --exit-code src/generated   # if generated code is committed
-pnpm typecheck && npm test
+pnpm typecheck && pnpm test
 ```
 
 `pnpm check:breaking` runs only the gate and writes nothing.

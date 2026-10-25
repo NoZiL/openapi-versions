@@ -8,7 +8,7 @@ Tooling: `mise install` (node, pnpm, oasdiff from `mise.toml`), then `pnpm insta
 - Package `openapi-versions`: runtime (`openapi-versions`, `/core`), codegen (`/codegen`), CLI (`npx openapi-versions`)
 - `pnpm codegen` regenerate `playground/generated` and `test/fixtures/generated` (both gitignored) from their `specs/` + `openapi-versions.config.json`
 - `pnpm check:breaking` only the oasdiff gate
-- `pnpm typecheck`, `npm test`, `pnpm build` (bundle CLI/API to `dist/`), `pnpm playground` (app), `pnpm playground:api` (CLI demo)
+- `pnpm typecheck`, `pnpm test`, `pnpm build` (bundle CLI/API to `dist/`), `pnpm playground` (app), `pnpm playground:api` (CLI demo)
 
 ## Rules (do not violate)
 

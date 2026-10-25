@@ -34,4 +34,4 @@ Backend serves `/api/vN+1` side by side with the frozen `/api/vN` (with `Sunset`
 
 ## Verify
 
-`pnpm codegen && pnpm typecheck && npm test`. Report what changed in `meta.ts`.
+`pnpm codegen && pnpm typecheck && pnpm test`. Report what changed in `meta.ts`.
