@@ -1,0 +1,6 @@
+- { name: blocked-upstream, color: "d93f0b", description: Waiting on openapi-ts/openapi-typescript or another dependency }
+- { name: tech-debt, color: "fbca04", description: Cleanup with no user-visible change }
+- { name: docs, color: "0075ca", description: Documentation }
+- { name: tooling, color: "5319e7", description: Build, CI, release, dev environment }
+- { name: decision, color: "0e8a16", description: Needs an ADR }
+- { name: good-first-issue, color: "7057ff", description: Small and self-contained }
