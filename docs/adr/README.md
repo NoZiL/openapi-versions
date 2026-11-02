@@ -11,3 +11,4 @@ One file per decision, `NNNN-title.md`, [MADR](https://adr.github.io/madr/) styl
 | [0005](0005-patch-openapi-typescript-helpers.md) | Patch `openapi-typescript-helpers` until upstream ships the fix | accepted |
 | [0006](0006-tooling-mise-pnpm-biome.md) | mise, pnpm, Biome, Vitest, Changesets, Renovate; no turbo yet | accepted |
 | [0007](0007-mit-license.md) | MIT license | accepted |
+| [0008](0008-prereleases-via-snapshots.md) | Prereleases are on-demand snapshots from `main` under the `next` tag | accepted |

@@ -20,6 +20,14 @@
     "release": "pnpm build && changeset publish"
   },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NoZiL/openapi-versions.git"
+  },
+  "homepage": "https://github.com/NoZiL/openapi-versions#readme",
+  "bugs": {
+    "url": "https://github.com/NoZiL/openapi-versions/issues"
+  },
   "devDependencies": {
     "@testing-library/react": "^16.3.3",
     "@types/node": "^26.6.5",
@@ -47,7 +55,7 @@
   },
   "type": "module",
   "bin": {
-    "openapi-versions": "./dist/cli.js"
+    "openapi-versions": "dist/cli.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

@@ -2,6 +2,7 @@ name: Release
 on:
   push:
     branches: [main]
+  workflow_dispatch: # snapshot prerelease, see docs/adr/0008
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
@@ -12,6 +13,7 @@ permissions:
 
 jobs:
   release:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/create-github-app-token@v2
@@ -30,5 +32,20 @@ jobs:
           version: pnpm changeset version
         env:
           GITHUB_TOKEN: ${{ steps.app.outputs.token }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: "true" # auth is npm trusted publishing (OIDC), no token
+
+  snapshot:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: jdx/mise-action@v3
+      - run: pnpm install --frozen-lockfile
+      - name: Require pending changesets
+        # without them `changeset publish` would publish the current version under the next tag
+        run: ls .changeset/*.md | grep -v README.md
+      - run: pnpm changeset version --snapshot next
+      - run: pnpm build
+      - run: pnpm changeset publish --tag next --no-git-tag
+        env:
           NPM_CONFIG_PROVENANCE: "true"

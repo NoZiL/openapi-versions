@@ -26,3 +26,7 @@ Todos are GitHub Issues and design decisions are ADRs in [`docs/adr/`](docs/adr/
 The repo allows **squash merge only**, and head branches are deleted automatically after merge. The PR title becomes the commit subject on `main` (GitHub appends ` (#<n>)`) and the PR description becomes its body, so write the title as a [conventional commit](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, `chore:`, `ci:`). If the PR resolves an issue, put `Closes #<n>` in the description; otherwise remove that line from the template.
 
 These are GitHub repository settings, not files in the repo. If they change, update this section.
+
+## Releases
+
+`main` is the trunk. Merging the Version Packages PR publishes to the `latest` tag. To try unreleased changes, run the **Release** workflow manually on `main` (Actions → Release → Run workflow). It publishes a snapshot such as `0.2.0-next-20261102123456` under the `next` tag, built from the pending changesets, and does nothing if there are none. Install it with `npm i openapi-versions@next`. See [ADR 0008](docs/adr/0008-prereleases-via-snapshots.md).
