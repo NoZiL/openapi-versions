@@ -17,7 +17,7 @@ Read `docs/concepts.md` once if the vocabulary (major, minor, floor, gated) is u
    ```
    The floor is the oldest minor the app supports and must have its own spec file. Ask the user for the floor if unknown (default suggestion: the oldest minor running in any environment: prod, staging, on-prem).
 4. **Generate**: `npx openapi-versions` (or an npm script). Expect `ok v1: a -> b` lines then `gen v1: …`.
-5. **Install**: `npm i openapi-versions openapi-fetch openapi-react-query @tanstack/react-query` and `npm i -D openapi-typescript "typescript@<7"`; apply the `openapi-typescript-helpers` patch from `patches/` (patch-package).
+5. **Install**: with the app's package manager (`npm i`, `pnpm add`, `yarn add`): runtime `openapi-versions openapi-fetch openapi-react-query @tanstack/react-query`, dev `openapi-typescript "typescript@<7"`; apply the `openapi-typescript-helpers` patch from `patches/` (patch-package).
    Import everything from the generated `<outDir>/v<n>/client.ts` (`ApiVersionProvider`, `useApi`, `Feature`, `createApi`, `Paths`); the major appears only in that import path.
 6. **Provider**: wrap the app in `QueryClientProvider` then `<ApiVersionProvider baseUrl="https://host/api/v<n>">`. The base URL must include the major prefix; `/version` is read relative to it.
 7. **Verify**: `pnpm typecheck && pnpm test`; for a visual check `pnpm playground`.

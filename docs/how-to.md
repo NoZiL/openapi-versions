@@ -146,7 +146,7 @@ oasdiff breaking specs/1.6.0.json new-spec.json --fail-on ERR
 Client CI:
 
 ```bash
-npm ci
+pnpm install --frozen-lockfile
 pnpm codegen        # fails on a breaking pair, bad config, or missing floor spec
 git diff --exit-code src/generated   # if generated code is committed
 pnpm typecheck && pnpm test
