@@ -30,5 +30,4 @@ jobs:
           version: pnpm changeset version
         env:
           GITHUB_TOKEN: ${{ steps.app.outputs.token }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-          NPM_CONFIG_PROVENANCE: "true"
+          NPM_CONFIG_PROVENANCE: "true" # auth is npm trusted publishing (OIDC), no token
