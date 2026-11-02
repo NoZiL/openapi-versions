@@ -55,7 +55,7 @@
   },
   "type": "module",
   "bin": {
-    "openapi-versions": "./dist/cli.js"
+    "openapi-versions": "dist/cli.js"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
