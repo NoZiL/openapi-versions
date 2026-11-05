@@ -26,7 +26,7 @@ jobs:
           token: ${{ steps.app.outputs.token }} # pushes and tags are made by the bot, so CI runs on the release PR
       - uses: jdx/mise-action@v3
       - run: pnpm install --frozen-lockfile
-      - uses: changesets/action@v1
+      - uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
         with:
           publish: pnpm release
           version: pnpm changeset version
