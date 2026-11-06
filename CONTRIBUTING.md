@@ -29,4 +29,6 @@ These are GitHub repository settings, not files in the repo. If they change, upd
 
 ## Releases
 
-`main` is the trunk. Merging the Version Packages PR publishes to the `latest` tag. To try unreleased changes, run the **Release** workflow manually on `main` (Actions → Release → Run workflow). It publishes a snapshot such as `0.2.0-next-20261102123456` under the `next` tag, built from the pending changesets, and does nothing if there are none. Install it with `npm i openapi-versions@next`. See [ADR 0008](docs/adr/0008-prereleases-via-snapshots.md).
+`main` is the trunk. Merging the Version Packages PR publishes to the `latest` tag, then Changesets pushes the `openapi-versions@<version>` git tag and creates the GitHub release. To try unreleased changes, run the **Release** workflow manually on `main` (Actions → Release → Run workflow). It publishes a snapshot such as `0.2.0-next-20261102123456` under the `next` tag, built from the pending changesets, and does nothing if there are none. Install it with `npm i openapi-versions@next`. See [ADR 0008](docs/adr/0008-prereleases-via-snapshots.md).
+
+Publishing is direct, through npm trusted publishing (GitHub OIDC): no npm token is stored, and the trusted publisher on npm must keep the plain publish permission for `NoZiL/openapi-versions` and `release.yml`. Do not switch it to staged publishing without adjusting the workflow: Changesets would tag and create the release when a version is staged, before it is live. See [ADR 0009](docs/adr/0009-direct-publish-trusted-publishing.md).
