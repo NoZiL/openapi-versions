@@ -1,7 +1,7 @@
 [tools]
 node = "24"
 pnpm = "12.3.4"
-"github:oasdiff/oasdiff" = "1.34.1"
+"github:oasdiff/oasdiff" = "v1.35.0"
 
 [tasks.install]
 run = "pnpm install"
