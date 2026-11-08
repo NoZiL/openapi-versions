@@ -7,4 +7,4 @@ Closes #
 - [ ] `mise run check` passes (lint, typecheck, test, breaking gate, build)
 - [ ] `pnpm changeset` added for any change to the published package
 - [ ] Generated output was not edited by hand (`playground/generated`, `test/fixtures/generated`)
-- [ ] A new or changed design decision has an ADR in `docs/adr/`
+- [ ] ADR added or superseded in `docs/adr/` if this touches a trigger in `AGENTS.md`
