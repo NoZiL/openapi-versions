@@ -14,11 +14,21 @@ case "$file" in
   *) cwd=$(printf '%s' "$input" | jq -r '.cwd // empty')
      file="${cwd:-.}/$file" ;;
 esac
-# Absolute, with (..) normalized so "src/../patches/x" can't slip through.
-file=$(node -e 'process.stdout.write(require("path").resolve(process.argv[1]))' "$file")
+# One node start prints two lines: the absolute path, with (..) normalized so
+# "src/../patches/x" can't slip through and resolved through symlinks when it exists
+# (a link to a patch is an edit to the patch); then that path relative to the project dir.
+paths=$(node -e '
+const p = require("path"), fs = require("fs");
+const real = (x) => { try { return fs.realpathSync(x); } catch { return p.resolve(x); } };
+const f = real(process.argv[2]);
+process.stdout.write(f + "\n" + p.relative(real(process.argv[1]), f));
+' "$project" "$file") || exit 0
+file=$(printf '%s\n' "$paths" | sed -n 1p)
+rel=$(printf '%s\n' "$paths" | sed -n 2p)
 
 check() {
-  case "$1" in
+  # Lowercase: on a case-insensitive file system (macOS) Playground/Generated is the same dir.
+  case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
     playground/generated|playground/generated/*|test/fixtures/generated|test/fixtures/generated/*)
       echo "Blocked: $file is generated (AGENTS.md rule 1). Change the spec or openapi-versions.config.json, then run 'pnpm codegen'." >&2
       exit 2 ;;
@@ -29,7 +39,7 @@ check() {
 }
 
 # Relative to the session's checkout: works even without git.
-check "$(node -e 'const p=require("path");process.stdout.write(p.relative(p.resolve(process.argv[1]),process.argv[2]))' "$project" "$file")"
+check "$rel"
 
 # Relative to the top level of the worktree holding the file. A Write may create the
 # file and its directories: ask git from the nearest existing ancestor and append the rest.
@@ -40,8 +50,7 @@ while [ ! -d "$dir" ]; do
   dir=$(dirname "$dir")
 done
 . "$(dirname "$0")/repo.sh"
-repo_same "$dir" "$project" || exit 0
-# --show-prefix resolves symlinks, so a path through a link to a worktree still matches.
+c=$(repo_common "$dir") && [ -n "$c" ] && pc=$(repo_common "$project") && [ "$c" = "$pc" ] || exit 0
 prefix=$(git -C "$dir" rev-parse --show-prefix 2>/dev/null) || exit 0
 check "$prefix$rest"
 exit 0

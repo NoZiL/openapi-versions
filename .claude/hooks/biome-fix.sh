@@ -31,7 +31,7 @@ pc=$(repo_common "$project") && [ -n "$pc" ] || {
   echo "biome-fix: skipped $file: project dir $project is not in a git repository" >&2
   exit 0
 }
-repo_same "$dir" "$project" || exit 0
+c=$(repo_common "$dir") && [ -n "$c" ] && [ "$c" = "$pc" ] || exit 0
 cd "$root" || exit 0
 # A worktree without `pnpm install` has no Biome: skip rather than report a lint failure.
 [ -x node_modules/.bin/biome ] || exit 0
