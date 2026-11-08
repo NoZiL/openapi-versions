@@ -23,3 +23,4 @@ One file per decision, `NNNN-title.md`, [MADR](https://adr.github.io/madr/) styl
 | [0017](0017-support-openapi-typescript-and-openapi-typesafe.md) | Support openapi-typescript and openapi-typesafe side by side; TS 5.4 to 7 on the typesafe path; amends 0005, supersedes 0012 | accepted |
 | [0018](0018-isolated-declarations-oxc-dts.md) | `.d.ts` from Oxc with `isolatedDeclarations` on `src/` + `codegen/`; explicit public return types; amends 0016 | accepted |
 | [0019](0019-open-enums-ir-node-on-typesafe-path.md) | The openapi-typesafe open-enum transform returns an IR node, not type text; parity ignores `\uXXXX` escaping; amends 0017 | accepted |
+| [0020](0020-check-fast-runs-codegen-once.md) | `check:fast` runs each codegen once as a shared mise dependency; typecheck and test only read; amends 0014, 0015 | accepted |
