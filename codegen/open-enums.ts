@@ -27,9 +27,9 @@ function extensibleEnum(schema: unknown): { values: string[]; nullable: boolean 
   const values = s["x-extensible-enum"];
   if (!isString || !Array.isArray(values) || !values.every((v: unknown) => typeof v === "string")) return undefined;
   // OpenAPI 3.1 `type: ["string", "null"]`, or OpenAPI 3.0 `nullable: true`. For 3.0, both generators add their own
-  // `| null` around the result in nested positions (array items, allOf/anyOf members) but not where the result replaces
-  // a property or component type, and the hook cannot tell those calls apart; so nested positions get a redundant
-  // `(... | null) | null`, the same type.
+  // `| null` around the result everywhere except where it replaces an object property or a top-level component
+  // (array items, allOf/anyOf members, additionalProperties, parameters, request bodies), and the hook cannot tell
+  // those calls apart; so those positions get a redundant `(... | null) | null`, the same type.
   return { values, nullable: (Array.isArray(s.type) && s.type.includes("null")) || s.nullable === true };
 }
 

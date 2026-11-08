@@ -7,6 +7,17 @@
   "paths": {
     "/things": {
       "get": {
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true,
+              "x-extensible-enum": ["a"]
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "ok",
@@ -65,6 +76,38 @@
           },
           "ref": {
             "$ref": "#/components/schemas/NullableOpen"
+          },
+          "composed": {
+            "allOf": [
+              {
+                "type": "string",
+                "nullable": true,
+                "x-extensible-enum": ["a"]
+              },
+              {
+                "description": "x"
+              }
+            ]
+          },
+          "anyOfNullable": {
+            "anyOf": [
+              {
+                "type": "string",
+                "nullable": true,
+                "x-extensible-enum": ["y"]
+              },
+              {
+                "type": "integer"
+              }
+            ]
+          },
+          "map": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "nullable": true,
+              "x-extensible-enum": ["a"]
+            }
           }
         }
       },

@@ -31,7 +31,8 @@ describe("generator parity", () => {
     ["playground/specs", "1.3.0"],
     // extensible enums inside arrays, allOf and nullable anyOf, nullable, and values that need escaping
     ["test/fixtures/enum-shapes", "1.0.0"],
-    // the same for OpenAPI 3.0 `nullable: true`
+    // OpenAPI 3.0 `nullable: true` open enums as properties, components, array items, allOf/anyOf members,
+    // additionalProperties and a query parameter, next to closed nullable enums
     ["test/fixtures/enum-shapes-3.0", "1.0.0"],
   ])("openapi-typescript and openapi-typesafe write the same schema.d.ts for %s", async (specsDir, floor) => {
     const [a, b] = await Promise.all([generate("openapi-typescript", specsDir, floor), generate("openapi-typesafe", specsDir, floor)]);
@@ -52,8 +53,13 @@ describe("generator parity", () => {
       expect(out).toContain(`nullable?: "a" | (string & {}) | null;`);
       expect(out).toContain(`notNullable?: "a" | (string & {});`);
       expect(out).toContain(`NullableOpen: "a" | (string & {}) | null;`);
-      // nested, the generator adds its own `| null` around the transform's result: redundant, same type
-      expect(out).toContain(`nullableItems?: (("a" | (string & {}) | null) | null)[];`);
+      expect(out).toContain(`ref?: components["schemas"]["NullableOpen"];`);
+      expect(out).toContain(`closedNullable?: "a" | null;`);
+      // elsewhere the generator may add its own `| null` around the transform's result: redundant, same type
+      const line = (name: string) => out.split("\n").find((l) => l.trimStart().startsWith(name)) ?? "";
+      for (const name of ["nullableItems?:", "q?:", "[key: string]:"]) {
+        expect(line(name)).toMatch(/"a" \| \(string & \{\}\) \| null\b/);
+      }
     },
   );
 
