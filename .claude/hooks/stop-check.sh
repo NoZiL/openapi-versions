@@ -32,10 +32,14 @@ fi
 # Skip the slow checks when nothing changed since the last green run.
 # State = HEAD + tracked diff + untracked paths and contents.
 cache="$(git rev-parse --git-dir)/claude-stop-check"
-state=$( { git rev-parse HEAD; git diff HEAD; git ls-files -o --exclude-standard -z | xargs -0 git hash-object --stdin-paths 2>/dev/null; git ls-files -o --exclude-standard; } | shasum | cut -d' ' -f1)
-if [ "$(cat "$cache" 2>/dev/null)" != "$state" ]; then
+# If hashing fails, leave state empty so the cache never hits.
+untracked=$(git ls-files -o --exclude-standard -z | xargs -0 git hash-object -- 2>&1) || untracked=""
+state=""
+[ -n "$untracked" ] || [ -z "$(git ls-files -o --exclude-standard)" ] \
+  && state=$( { git rev-parse HEAD; git diff HEAD; printf '%s\n' "$untracked"; git ls-files -o --exclude-standard; } | shasum | cut -d' ' -f1)
+if [ -z "$state" ] || [ "$(cat "$cache" 2>/dev/null)" != "$state" ]; then
   if out=$(mise run check:fast 2>&1); then
-    printf '%s' "$state" > "$cache"
+    [ -z "$state" ] || printf '%s' "$state" > "$cache"
   else
     reasons="${reasons:+$reasons
 
