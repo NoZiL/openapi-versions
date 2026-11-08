@@ -9,7 +9,7 @@ mise install
 pnpm install
 ```
 
-`mise run check` runs everything CI runs (lint, typecheck, test, breaking-change gate, build).
+`mise run check` runs everything CI runs (lint, workflow lint, typecheck, test, breaking-change gate, build).
 
 ## Before you start
 

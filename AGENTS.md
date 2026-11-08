@@ -3,7 +3,7 @@
 One client build must work against a range of minor versions of one API major. Codegen merges specs; the runtime hides what the connected backend lacks. Full docs: `docs/README.md`.
 
 ## Commands
-Tooling: `mise install` (node, pnpm, oasdiff from `mise.toml`), then `pnpm install`. `pnpm lint` (biome), `pnpm changeset` for any change to the published package.
+Tooling: `mise install` (node, pnpm, oasdiff, actionlint from `mise.toml`), then `pnpm install`. `pnpm lint` (biome), `pnpm changeset` for any change to the published package.
 
 - Package `openapi-versions`: runtime (`openapi-versions`, `/core`), codegen (`/codegen`), CLI (`npx openapi-versions`)
 - `pnpm codegen` regenerate `playground/generated` and `test/fixtures/generated` (both gitignored) from their `specs/` + `openapi-versions.config.json`
