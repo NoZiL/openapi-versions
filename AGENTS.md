@@ -27,6 +27,8 @@ Todos are GitHub Issues (labels in `.github/labels.yml`, `blocked-upstream` for 
 ## Session scope
 One issue per session and per PR. Do what the issue asks; log out-of-scope findings as new issues instead of fixing them in place. Plan first for anything non-trivial. Delegate broad searches to subagents. After opening a PR, or when context gets heavy, run `/wrap-up` (handoff note in the issue) and start a fresh session. The project status line shows context usage, and a hook flags the session at 70% context or 5 commits ahead of `main`.
 
+Before opening a PR, get an independent review: run `/code-review high origin/main...HEAD` (the whole PR range, not one commit). Also check the issue's "done when" list, say whether an ADR is needed, and run what the PR claims to have tested. Fix what it finds, re-run at most once more, then hand the rest to the human. Merging stays human-gated.
+
 ## Skills
 
 `skills/openapi-versions-setup`, `skills/openapi-versions-add-spec`, `skills/openapi-versions-gate-feature` (also exposed to Claude Code via `.claude/skills`).
