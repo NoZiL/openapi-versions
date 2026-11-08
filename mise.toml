@@ -3,6 +3,7 @@ node = "26"
 pnpm = "12.18.0"
 "github:oasdiff/oasdiff" = "v1.35.0"
 actionlint = "1.7.12"
+jq = "1.8.2"
 
 [tasks.install]
 run = "pnpm install"
