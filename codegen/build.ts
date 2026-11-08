@@ -98,7 +98,7 @@ export async function build(
 
     const out = path.join(config.outDir, `v${major}`);
     const meta = { major, floor, newest: group.at(-1)!.version, specs: group.map((g) => g.version), ops, gatedOps, gatedFields };
-    // meta.ts first: its header marks the dir as codegen's (pruneDroppedMajors), even if a run dies after it
+    // meta.ts first: its header marks the dir as codegen's (droppedMajors), even if a run dies after it
     writes.push([
       path.join(out, "meta.ts"),
       `${HEADER}\n` +
@@ -130,15 +130,19 @@ export async function build(
         majors.map((m) => `export type { GatedOp as GatedOpV${m}, GatedField as GatedFieldV${m} } from "./v${m}/meta";`).join("\n") +
         "\n",
     ]);
-    // serialized with other codegen runs on this outDir, so the last one leaves one whole generation
-    await withOutDirLock(config.outDir, () => {
-      for (const dir of new Set(writes.map(([file]) => path.dirname(file)))) {
-        fs.mkdirSync(dir, { recursive: true });
-        removeStaleTemps(dir);
-      }
-      writeChanged(writes);
-      pruneDroppedMajors(config.outDir, majors);
-    });
+    // Nothing to change (same generation on disk, nothing to prune): skip the lock too, so a no-op
+    // regen does not touch outDir at all. Otherwise serialize with other codegen runs on this
+    // outDir, so the last one leaves one whole generation (ADR 0023).
+    if (writes.some(([file, content]) => !isSame(file, Buffer.from(content))) || droppedMajors(config.outDir, majors).length) {
+      await withOutDirLock(config.outDir, () => {
+        for (const dir of new Set(writes.map(([file]) => path.dirname(file)))) {
+          fs.mkdirSync(dir, { recursive: true });
+          removeStaleTemps(dir);
+        }
+        writeChanged(writes);
+        for (const dir of droppedMajors(config.outDir, majors)) fs.rmSync(dir, { recursive: true, force: true });
+      });
+    }
   }
   return report;
 }
@@ -148,8 +152,16 @@ const TEMP = /^\..+\.[0-9a-f-]{36}\.tmp$/;
 const STALE_TEMP_MS = 10 * 60 * 1000;
 
 /** `v<n>` dirs this codegen wrote (their meta.ts has our header) for majors no longer in the config. */
-function pruneDroppedMajors(outDir: string, majors: number[]): void {
-  for (const entry of fs.readdirSync(outDir, { withFileTypes: true })) {
+function droppedMajors(outDir: string, majors: number[]): string[] {
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(outDir, { withFileTypes: true });
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw e;
+  }
+  const dropped: string[] = [];
+  for (const entry of entries) {
     if (!entry.isDirectory() || !/^v\d+$/.test(entry.name) || majors.includes(Number(entry.name.slice(1)))) continue;
     const dir = path.join(outDir, entry.name);
     let meta: string;
@@ -158,8 +170,9 @@ function pruneDroppedMajors(outDir: string, majors: number[]): void {
     } catch {
       continue;
     }
-    if (meta.startsWith(HEADER)) fs.rmSync(dir, { recursive: true, force: true });
+    if (meta.startsWith(HEADER)) dropped.push(dir);
   }
+  return dropped;
 }
 
 /** Temp files left by a codegen killed between write and rename; a live run's temp is seconds old. */
@@ -183,18 +196,29 @@ function removeStaleTemps(dir: string): void {
  * failure among them is unlikely; if one does fail, the rest are not renamed and their temps removed.
  */
 function writeChanged(writes: [file: string, content: string][]): void {
-  const staged: { file: string; tmp: string; bytes: Buffer }[] = [];
+  // tmp undefined: Windows refused the temp, so this file is written in place at rename time
+  const staged: { file: string; tmp?: string; bytes: Buffer }[] = [];
   const dropTemps = (from: number) => {
-    for (const { tmp } of staged.slice(from)) fs.rmSync(tmp, { force: true });
+    for (const { tmp } of staged.slice(from)) if (tmp) fs.rmSync(tmp, { force: true });
   };
   try {
     for (const [file, content] of writes) {
       const bytes = Buffer.from(content);
       if (isSame(file, bytes)) continue;
       // unique per write: concurrent runs (other processes, threads, containers) never share a temp
-      const tmp = path.join(path.dirname(file), `.${path.basename(file)}.${randomUUID()}.tmp`);
-      staged.push({ file, tmp, bytes });
-      fs.writeFileSync(tmp, bytes);
+      const entry: (typeof staged)[number] = {
+        file,
+        tmp: path.join(path.dirname(file), `.${path.basename(file)}.${randomUUID()}.tmp`),
+        bytes,
+      };
+      staged.push(entry);
+      try {
+        fs.writeFileSync(entry.tmp!, bytes);
+      } catch (e) {
+        if (!isWindowsBusy(e)) throw e;
+        fs.rmSync(entry.tmp!, { force: true });
+        entry.tmp = undefined;
+      }
     }
   } catch (e) {
     dropTemps(0);
@@ -214,21 +238,30 @@ function isSame(file: string, bytes: Buffer): boolean {
   try {
     return fs.statSync(file).size === bytes.length && fs.readFileSync(file).equals(bytes);
   } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === "ENOENT") return false;
+    const code = (e as NodeJS.ErrnoException).code;
+    if (code === "ENOENT" || code === "ENOTDIR") return false;
     throw e;
   }
 }
 
-function replace(file: string, tmp: string, bytes: Buffer): void {
-  try {
-    fs.renameSync(tmp, file);
-  } catch (e) {
-    // Windows refuses to replace a file another process holds open; fall back to an in-place write
-    const code = (e as NodeJS.ErrnoException).code;
-    if (process.platform !== "win32" || !(code === "EPERM" || code === "EBUSY" || code === "EACCES")) throw e;
-    fs.rmSync(tmp, { force: true });
-    fs.writeFileSync(file, bytes);
+/** Windows refuses to create or replace a file another process (an editor, antivirus, an indexer) holds open. */
+function isWindowsBusy(e: unknown): boolean {
+  const code = (e as NodeJS.ErrnoException).code;
+  return process.platform === "win32" && (code === "EPERM" || code === "EBUSY" || code === "EACCES");
+}
+
+function replace(file: string, tmp: string | undefined, bytes: Buffer): void {
+  if (tmp) {
+    try {
+      fs.renameSync(tmp, file);
+      return;
+    } catch (e) {
+      if (!isWindowsBusy(e)) throw e;
+      fs.rmSync(tmp, { force: true });
+    }
   }
+  // the Windows fallback: an in-place write, as before ADR 0021
+  fs.writeFileSync(file, bytes);
 }
 
 /** Binds the generic runtime to this major's generated types: apps import everything from here. */

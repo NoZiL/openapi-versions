@@ -18,6 +18,8 @@ export const LOCK_FILE = ".openapi-versions.lock";
 interface Owner {
   pid: number;
   host: string;
+  /** Linux PID namespace (`/proc/self/ns/pid`): containers sharing a hostname do not share PIDs */
+  ns?: string;
   token: string;
   since: string;
 }
@@ -29,6 +31,14 @@ export interface LockOptions {
   timeoutMs?: number;
   pollMs?: number;
 }
+
+const PID_NS = (() => {
+  try {
+    return fs.readlinkSync("/proc/self/ns/pid");
+  } catch {
+    return undefined;
+  }
+})();
 
 /** Runs `fn` while holding `<outDir>/.openapi-versions.lock`, waiting for another holder first. */
 export async function withOutDirLock<T>(
@@ -43,13 +53,10 @@ export async function withOutDirLock<T>(
   for (;;) {
     if (tryCreate(file, token)) break;
     const held = readLock(file);
-    if (!held) continue; // released meanwhile
-    if (isStale(held, staleMs)) {
-      takeOver(file, held.raw);
-      continue;
-    }
+    // held is undefined if it was released meanwhile (or, on Windows, is being deleted): poll again
+    if (held && isStale(held, staleMs) && takeOver(file, held.raw, staleMs)) continue;
     if (Date.now() > deadline) {
-      const who = held.owner ? `pid ${held.owner.pid} on ${held.owner.host} since ${held.owner.since}` : "another codegen";
+      const who = held?.owner ? `pid ${held.owner.pid} on ${held.owner.host} since ${held.owner.since}` : "another codegen";
       throw new Error(`Timed out waiting for ${file}, held by ${who}. Delete it if no codegen is running.`);
     }
     await new Promise((r) => setTimeout(r, pollMs));
@@ -66,15 +73,22 @@ function tryCreate(file: string, token: string): boolean {
   try {
     fd = fs.openSync(file, "wx");
   } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === "EEXIST") return false;
+    const code = (e as NodeJS.ErrnoException).code;
+    if (code === "EEXIST") return false;
+    // Windows: a lock deleted while another process has it open stays "delete pending" for a moment
+    if (process.platform === "win32" && (code === "EPERM" || code === "EACCES")) return false;
     throw e;
   }
   try {
-    const owner: Owner = { pid: process.pid, host: os.hostname(), token, since: new Date().toISOString() };
+    const owner: Owner = { pid: process.pid, host: os.hostname(), ns: PID_NS, token, since: new Date().toISOString() };
     fs.writeSync(fd, JSON.stringify(owner));
-  } finally {
+  } catch (e) {
+    // an empty lock (disk full) would block every run for staleMs
     fs.closeSync(fd);
+    fs.rmSync(file, { force: true });
+    throw e;
   }
+  fs.closeSync(fd);
   return true;
 }
 
@@ -85,10 +99,19 @@ interface Held {
   mtimeMs: number;
 }
 
+/** Content and mtime through one fd, so they describe the same lock even if it is replaced meanwhile. */
 function readLock(file: string): Held | undefined {
+  let fd: number;
   try {
-    const mtimeMs = fs.statSync(file).mtimeMs;
-    const raw = fs.readFileSync(file, "utf8");
+    fd = fs.openSync(file, "r");
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    if (code === "ENOENT" || (process.platform === "win32" && code === "EPERM")) return undefined;
+    throw e;
+  }
+  try {
+    const { mtimeMs } = fs.fstatSync(fd);
+    const raw = fs.readFileSync(fd, "utf8");
     let owner: Owner | undefined;
     try {
       owner = JSON.parse(raw);
@@ -96,15 +119,14 @@ function readLock(file: string): Held | undefined {
       owner = undefined;
     }
     return { raw, owner, mtimeMs };
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === "ENOENT") return undefined;
-    throw e;
+  } finally {
+    fs.closeSync(fd);
   }
 }
 
 function isStale({ owner, mtimeMs }: Held, staleMs: number): boolean {
   if (Date.now() - mtimeMs > staleMs) return true;
-  return owner !== undefined && owner.host === os.hostname() && !isAlive(owner.pid);
+  return owner !== undefined && owner.host === os.hostname() && owner.ns === PID_NS && !isAlive(owner.pid);
 }
 
 function isAlive(pid: number): boolean {
@@ -117,33 +139,33 @@ function isAlive(pid: number): boolean {
 }
 
 /**
- * Removes a stale lock without removing a fresh one that replaced it: the lock is moved aside
- * first, and if what was moved is not the lock judged stale (another waiter took over and a new
- * holder created it in between), it is put back with `link`, which fails rather than overwrite.
+ * Removes a stale lock without removing a fresh one that replaced it. Takers-over go one at a time
+ * through `<lock>.takeover` (itself `O_EXCL`), and the one holding it deletes the lock only if it
+ * still reads as the stale one. Returns false if another waiter is taking over.
  */
-function takeOver(file: string, staleRaw: string): void {
-  const aside = `${file}.${randomUUID()}.stale`;
+function takeOver(file: string, staleRaw: string, staleMs: number): boolean {
+  const gate = `${file}.takeover`;
   try {
-    fs.renameSync(file, aside);
+    fs.closeSync(fs.openSync(gate, "wx"));
   } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === "ENOENT") return;
-    throw e;
+    if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
+    // left by a waiter killed mid-takeover, which lasts microseconds
+    try {
+      if (Date.now() - fs.statSync(gate).mtimeMs > staleMs) fs.rmSync(gate, { force: true });
+    } catch {
+      // removed meanwhile
+    }
+    return false;
   }
   try {
-    if (fs.readFileSync(aside, "utf8") !== staleRaw) {
-      try {
-        fs.linkSync(aside, file);
-      } catch (e) {
-        if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
-      }
-    }
+    if (readLock(file)?.raw === staleRaw) fs.rmSync(file, { force: true });
   } finally {
-    fs.rmSync(aside, { force: true });
+    fs.rmSync(gate, { force: true });
   }
+  return true;
 }
 
 /** Removes the lock only if it is still ours: a holder that ran past `staleMs` may have lost it. */
 function release(file: string, token: string): void {
-  const held = readLock(file);
-  if (held?.owner?.token === token) fs.rmSync(file, { force: true });
+  if (readLock(file)?.owner?.token === token) fs.rmSync(file, { force: true });
 }

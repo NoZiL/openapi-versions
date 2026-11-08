@@ -37,7 +37,7 @@ const snapshot = (dir: string) =>
       .sort()
       .map((f) => [f, fs.statSync(path.join(dir, f)).isDirectory() ? "<dir>" : fs.readFileSync(path.join(dir, f), "utf8")]),
   );
-const writeLock = (outDir: string, owner: { pid: number; host?: string }, mtime?: Date) => {
+const writeLock = (outDir: string, owner: { pid: number; host?: string; ns?: string }, mtime?: Date) => {
   const file = path.join(outDir, LOCK_FILE);
   fs.writeFileSync(file, JSON.stringify({ host: os.hostname(), token: "someone-else", since: new Date().toISOString(), ...owner }));
   if (mtime) fs.utimesSync(file, mtime, mtime);
@@ -50,17 +50,27 @@ describe("codegen write lock (ADR 0023)", () => {
   it("waits for a live holder, then writes and removes its lock", async () => {
     const outDir = tmp();
     const lock = writeLock(outDir, { pid: process.pid });
+    const logs: string[] = [];
     let done = false;
-    const run = build(cfg(outDir), quiet).then(() => {
+    const run = build(cfg(outDir), { log: (m) => logs.push(m) }).then(() => {
       done = true;
     });
-    await sleep(300);
+    // generation is over (it logs "gen") well before the wait ends: only the lock holds the writes back
+    while (!logs.some((m) => m.startsWith("gen"))) await sleep(10);
+    await sleep(200);
     expect(done).toBe(false);
     expect(fs.existsSync(path.join(outDir, "v1"))).toBe(false);
     fs.rmSync(lock);
     await run;
     expect(fs.existsSync(path.join(outDir, "v1", "meta.ts"))).toBe(true);
     expect(fs.existsSync(lock)).toBe(false);
+  });
+
+  it("takes no lock when nothing would change, so a no-op regen touches nothing", async () => {
+    const outDir = tmp();
+    await build(cfg(outDir), quiet);
+    writeLock(outDir, { pid: process.pid });
+    await build(cfg(outDir), quiet); // would wait 60 s if it took the lock
   });
 
   it("takes over a lock whose process is dead", async () => {
@@ -82,6 +92,20 @@ describe("codegen write lock (ADR 0023)", () => {
     const outDir = tmp();
     writeLock(outDir, { pid: deadPid(), host: "elsewhere" });
     await expect(withOutDirLock(outDir, () => 1, { timeoutMs: 100 })).rejects.toThrow(/Timed out .* pid \d+ on elsewhere/);
+  });
+
+  it("does not judge a PID from another PID namespace (container with the same hostname) dead", async () => {
+    const outDir = tmp();
+    writeLock(outDir, { pid: deadPid(), ns: "pid:[1]" });
+    await expect(withOutDirLock(outDir, () => 1, { timeoutMs: 100 })).rejects.toThrow(/Timed out/);
+  });
+
+  it("leaves a stale lock alone while another waiter is taking it over", async () => {
+    const outDir = tmp();
+    const lock = writeLock(outDir, { pid: deadPid() });
+    fs.writeFileSync(`${lock}.takeover`, "");
+    await expect(withOutDirLock(outDir, () => 1, { timeoutMs: 100 })).rejects.toThrow(/Timed out/);
+    expect(fs.existsSync(lock)).toBe(true);
   });
 
   it("releases the lock when the write phase throws", async () => {
