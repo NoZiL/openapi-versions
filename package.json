@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "description": "Multi-version OpenAPI client for the openapi-ts ecosystem: merges the minor specs of one API major, generates tolerant types with openapi-typescript, and gates features at runtime.",
   "scripts": {
-    "codegen:playground": "rm -rf playground/generated && tsx codegen/cli.ts --config playground/openapi-versions.config.json",
-    "codegen:test": "rm -rf test/fixtures/generated && tsx codegen/cli.ts --config test/fixtures/openapi-versions.config.json",
+    "codegen:playground": "tsx codegen/cli.ts --config playground/openapi-versions.config.json",
+    "codegen:test": "tsx codegen/cli.ts --config test/fixtures/openapi-versions.config.json",
     "codegen": "pnpm codegen:playground && pnpm codegen:test",
     "check:breaking": "tsx codegen/cli.ts --check-only --config playground/openapi-versions.config.json",
     "typecheck": "pnpm codegen && pnpm typecheck:tsc",

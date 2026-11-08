@@ -111,3 +111,31 @@ describe("gate modes when oasdiff is unavailable", () => {
     expect(() => validateConfig({ specsDir: "s", outDir: "o", majors: { 1: { floor: "1.0.0" } }, gate: "maybe" })).toThrow(/gate/);
   });
 });
+
+describe("regenerating over existing output (ADR 0021)", () => {
+  const cfg = (outDir: string) => ({ specsDir: "test/fixtures/specs", outDir, majors: { 1: { floor: "1.3.0" } }, gate: "off" as const });
+  const files = (dir: string) => fs.readdirSync(dir, { recursive: true, encoding: "utf8" }).sort();
+
+  it("leaves unchanged files untouched, replaces changed ones, prunes dropped majors", async () => {
+    const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "openapi-versions-"));
+    try {
+      await build(cfg(outDir), { log: () => {} });
+      const listed = files(outDir);
+      const meta = path.join(outDir, "v1", "meta.ts");
+      const schema = path.join(outDir, "v1", "schema.d.ts");
+      const old = new Date(2000, 0, 1);
+      fs.utimesSync(schema, old, old);
+      fs.writeFileSync(meta, "// stale\n");
+      fs.mkdirSync(path.join(outDir, "v9"));
+      fs.writeFileSync(path.join(outDir, "v9", "meta.ts"), "// dropped major\n");
+
+      await build(cfg(outDir), { log: () => {} });
+
+      expect(files(outDir)).toEqual(listed); // v9 pruned, no temp files left
+      expect(fs.statSync(schema).mtime).toEqual(old); // same content: not rewritten
+      expect(fs.readFileSync(meta, "utf8")).toMatch(/^\/\/ generated/);
+    } finally {
+      fs.rmSync(outDir, { recursive: true, force: true });
+    }
+  });
+});
