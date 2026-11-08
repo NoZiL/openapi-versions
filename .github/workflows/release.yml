@@ -43,7 +43,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Require pending changesets
         # without them `changeset publish` would publish the current version under the next tag
-        run: ls .changeset/*.md | grep -v README.md
+        run: find .changeset -name '*.md' ! -name README.md | grep -q .
       - run: pnpm changeset version --snapshot next
       - run: pnpm build
       - run: pnpm changeset publish --tag next --no-git-tag
