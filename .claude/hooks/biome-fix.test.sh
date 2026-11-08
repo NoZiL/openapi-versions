@@ -40,12 +40,17 @@ export PATH="$tmp/bin:$PATH" LOG="$log" CLAUDE_PROJECT_DIR="$tmp/main"
 
 fails=0
 # expect <expected cwd, or "none"> <rc> <file_path> <name> [<path Biome gets>]
-# file_path is sent as is, with hook input cwd $CWD (default $tmp/main); the hook
-# process always starts in $tmp/main, as mise starts it in the project's top level.
+# file_path is sent as is, with hook input cwd $CWD (default $tmp/main, "none" to
+# omit the key); the hook process always starts in $PROC (default $tmp/main), as
+# mise starts it in the project's top level.
 expect() {
   : > "$log"
   rc=0
-  (cd "$tmp/main" && printf '{"cwd":"%s","tool_input":{"file_path":"%s"}}' "${CWD:-$tmp/main}" "$3" | sh "$hook" 2> "$tmp/err") || rc=$?
+  case "${CWD-$tmp/main}" in
+    none) json=$(printf '{"tool_input":{"file_path":"%s"}}' "$3") ;;
+    *) json=$(printf '{"cwd":"%s","tool_input":{"file_path":"%s"}}' "${CWD-$tmp/main}" "$3") ;;
+  esac
+  (cd "${PROC:-$tmp/main}" && printf '%s' "$json" | sh "$hook" 2> "$tmp/err") || rc=$?
   if [ "$1" = none ]; then want=""; else want=$(printf '%s %s\n' "$1" "$5" "$1" "$5" "$1" "$5"); fi
   if [ "$(cat "$log")" = "$want" ] && [ "$rc" = "$2" ]; then echo "ok   $4"
   else echo "FAIL $4: rc=$rc, calls: $(cat "$log"), stderr: $(cat "$tmp/err")"; fails=$((fails + 1)); fi
@@ -56,7 +61,11 @@ expect "$tmp/main" 0 "$tmp/main/src/b.ts" "file in a subdirectory: runs from the
 expect "$tmp/main" 0 "src/b.ts" "relative file_path" ./src/b.ts
 export CWD="$tmp/main/src"
 expect "$tmp/main" 0 "b.ts" "relative file_path: resolved against the hook input cwd" ./src/b.ts
-unset CWD
+export CWD=none PROC="$tmp/main/src"
+expect "$tmp/main" 0 "b.ts" "relative file_path, no cwd in the input: process cwd" ./src/b.ts
+export CWD=""
+expect "$tmp/main" 0 "b.ts" "relative file_path, empty cwd: process cwd" ./src/b.ts
+unset CWD PROC
 expect "$tmp/main" 0 "$tmp/main/-dash.ts" "file name starting with -: passed as a path" ./-dash.ts
 expect "$tmp/wt" 0 "$tmp/wt/src/c.ts" "file in another worktree: runs from that worktree" ./src/c.ts
 expect "$tmp/wt" 0 "$tmp/link/src/c.ts" "file through a symlink: path under the top level" ./src/c.ts
