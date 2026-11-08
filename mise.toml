@@ -26,6 +26,13 @@ run = "pnpm check:breaking"
 [tasks.build]
 run = "pnpm build"
 
+[tasks."hook:guard"]
+description = "Claude Code PreToolUse: deny edits to generated dirs and patches/ (stdin: hook JSON)"
+file = ".claude/hooks/guard-generated.sh"
+[tasks."hook:biome"]
+description = "Claude Code PostToolUse: safe biome fixes on the edited file (stdin: hook JSON)"
+file = ".claude/hooks/biome-fix.sh"
+
 [settings]
 # Lock only what we run on (CI + dev machines); every extra platform is another GitHub download that can 504.
 lockfile_platforms = ["linux-x64", "macos-arm64"]
