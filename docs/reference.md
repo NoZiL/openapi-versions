@@ -11,6 +11,7 @@ File: `openapi-versions.config.json`. JSON Schema: [`openapi-versions.schema.jso
 | `majors`           | object                                        | Keyed by major number (`"1"`). Normally one entry per app release.                                                                                                             |
 | `majors.<n>.floor` | plain semver                                  | Oldest supported minor of major `n`. Must be in major `n` and must have a spec file.                                                                                           |
 | `gate`             | `"auto"` \| `"required"` \| `"off"`, optional | Breaking-change gate. `auto` (default): run oasdiff if installed, otherwise warn and skip. `required`: fail when oasdiff is missing or older than 1.34.0. `off`: never run it. |
+| `generator`        | `"openapi-typescript"` \| `"openapi-typesafe"`, optional | Generator that writes `schema.d.ts`. Default: the one installed; openapi-typescript if both are. openapi-typesafe supports TypeScript 5.4 to 7, needs no helpers patch and needs Node 22.12 or newer ([ADR 0017](adr/0017-support-openapi-typescript-and-openapi-typesafe.md)). |
 | `runtimeImport`    | string, optional                              | Module the generated `client.ts` imports the runtime from. Default `openapi-versions`. A relative path when developing the runtime in the same repo.                           |
 
 ## CLI
@@ -25,7 +26,7 @@ openapi-versions [--config <path>] [--check-only] [--require-gate]
 | `--check-only`   | Run only the oasdiff gate; write nothing. Fails if oasdiff is missing.                                          |
 | `--require-gate` | Fail when oasdiff is missing or too old, instead of skipping the gate. Same as `"gate": "required"`. Use in CI. |
 
-Exit code 1 on: invalid config, missing floor spec, any breaking pair, and (with `--require-gate`, `"gate": "required"` or `--check-only`) a missing or too-old oasdiff (minimum 1.34.0). Environment: `OASDIFF_BIN` overrides the oasdiff binary.
+Exit code 1 on: invalid config, no generator installed (or the configured one missing), missing floor spec, any breaking pair, and (with `--require-gate`, `"gate": "required"` or `--check-only`) a missing or too-old oasdiff (minimum 1.34.0). Environment: `OASDIFF_BIN` overrides the oasdiff binary.
 
 ## Package entry points
 
@@ -37,7 +38,7 @@ Exit code 1 on: invalid config, missing floor spec, any breaking pair, and (with
 | `openapi-versions/schema.json` | JSON Schema of the config                                                                                                      |
 | `npx openapi-versions`         | The CLI                                                                                                                        |
 
-Apps rarely call `createVersionAware` themselves: the generated `client.ts` does, with the app's types. Peers: `openapi-typescript`, `openapi-fetch`, and optionally `openapi-react-query`, `@tanstack/react-query`, `react`.
+Apps rarely call `createVersionAware` themselves: the generated `client.ts` does, with the app's types. Peers: `openapi-fetch`, one generator for codegen (`openapi-typescript` or `openapi-typesafe`, both optional peers: install the one you use), and optionally `openapi-react-query`, `@tanstack/react-query`, `react`.
 
 In this repo: `pnpm codegen`, `pnpm check:breaking`, `pnpm build` (bundles with tsdown into `dist/`).
 
@@ -56,6 +57,7 @@ const report = await build(loadConfig("openapi-versions.config.json"), { checkOn
 | `mergeAll(docs)` / `mergeTolerant(a, b)`   | Tolerant merge of OpenAPI documents.                                                 |
 | `computeSince(docs, floor)`                | `{ ops, gatedOps, gatedFields }`                                                     |
 | `checkChain(files)` / `checkPair(a, b)`    | oasdiff gate.                                                                        |
+| `loadGenerator(name?)`                     | Configured or installed generator: `{ name, generate(doc) }` returning `schema.d.ts` text. |
 | `openEnums`                                | openapi-typescript `transform` hook for `x-extensible-enum`.                         |
 
 ## Pipeline, per major
@@ -64,7 +66,7 @@ const report = await build(loadConfig("openapi-versions.config.json"), { checkOn
 2. `oasdiff breaking <prev> <next> --fail-on ERR` for each consecutive pair.
 3. Tolerant merge (rules below). `info.version` of the merged doc becomes `"<floor> - <newest>"`.
 4. Since maps.
-5. `openapi-typescript` on the merged doc with the `openEnums` transform.
+5. The generator (`openapi-typescript`, or `openapi-typesafe` with `irCallbacks`) on the merged doc, with the open-enum transform.
 
 ## Merge rules
 
@@ -89,7 +91,7 @@ The inputs must be non-breaking relative to each other (step 2); otherwise the u
 
 | File                                | Content                                                                                                                                                                           |
 | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `<outDir>/v<n>/schema.d.ts`         | openapi-typescript types of the merged contract; extensible enums are open unions                                                                                                 |
+| `<outDir>/v<n>/schema.d.ts`         | Types of the merged contract from the chosen generator; extensible enums are open unions                                                                                                |
 | `<outDir>/v<n>/meta.ts`             | `meta = { major, floor, newest, specs, ops, gatedOps, gatedFields }` plus `Op`, `GatedOp`, `GatedField` types                                                                     |
 | `<outDir>/v<n>/merged.openapi.json` | the merged document (useful to inspect or diff)                                                                                                                                   |
 | `<outDir>/v<n>/client.ts`           | the runtime bound to this major: `ApiVersionProvider`, `useApi`, `useSupports`, `useHasField`, `useSunset`, `Feature`, `createApi`, types `Paths`, `GatedOp`, `GatedField`, `Api` |

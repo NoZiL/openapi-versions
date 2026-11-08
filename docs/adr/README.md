@@ -22,3 +22,4 @@ One file per decision, `NNNN-title.md`, [MADR](https://adr.github.io/madr/) styl
 | [0016](0016-build-with-tsdown.md) | Build with tsdown; `.d.ts` from TypeScript 5, no dev-only TS 7 yet | accepted |
 | [0017](0017-support-openapi-typescript-and-openapi-typesafe.md) | Support openapi-typescript and openapi-typesafe side by side; TS 5.4 to 7 on the typesafe path; amends 0005, supersedes 0012 | accepted |
 | [0018](0018-isolated-declarations-oxc-dts.md) | `.d.ts` from Oxc with `isolatedDeclarations` on `src/` + `codegen/`; explicit public return types; amends 0016 | accepted |
+| [0019](0019-open-enums-ir-node-on-typesafe-path.md) | The openapi-typesafe open-enum transform returns an IR node, not type text; parity ignores `\uXXXX` escaping; amends 0017 | accepted |

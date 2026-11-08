@@ -4,6 +4,7 @@
  */
 import fs from "node:fs";
 import semver from "semver";
+import { GENERATORS, type GeneratorName } from "./generator";
 
 /** auto: run the oasdiff gate when oasdiff is installed, warn and skip otherwise. required: fail if it cannot run. off: never run it. */
 export type GateMode = "auto" | "required" | "off";
@@ -17,6 +18,8 @@ export interface Config {
   runtimeImport?: string;
   /** Breaking-change gate. Default "auto". */
   gate?: GateMode;
+  /** Type generator. Default: the installed one, openapi-typescript if both are. */
+  generator?: GeneratorName;
 }
 
 export const DEFAULT_RUNTIME_IMPORT = "openapi-versions";
@@ -28,7 +31,7 @@ export function validateConfig(raw: unknown, source = "config"): Config {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) fail("must be a JSON object");
   const c = raw as Record<string, unknown>;
   for (const key of Object.keys(c))
-    if (!["$schema", "specsDir", "outDir", "majors", "runtimeImport", "gate"].includes(key)) fail(`unknown key "${key}"`);
+    if (!["$schema", "specsDir", "outDir", "majors", "runtimeImport", "gate", "generator"].includes(key)) fail(`unknown key "${key}"`);
   for (const key of ["specsDir", "outDir"] as const) {
     if (typeof c[key] !== "string" || !c[key]) fail(`"${key}" must be a non-empty string`);
   }
@@ -36,6 +39,8 @@ export function validateConfig(raw: unknown, source = "config"): Config {
     fail(`"runtimeImport" must be a non-empty string`);
   if (c.gate !== undefined && !GATE_MODES.includes(c.gate as GateMode))
     fail(`"gate" must be one of ${GATE_MODES.map((m) => `"${m}"`).join(", ")}`);
+  if (c.generator !== undefined && !GENERATORS.includes(c.generator as GeneratorName))
+    fail(`"generator" must be one of ${GENERATORS.map((g) => `"${g}"`).join(", ")}`);
   const majors = c.majors;
   if (!majors || typeof majors !== "object" || Array.isArray(majors) || !Object.keys(majors).length)
     fail(`"majors" must list at least one major, e.g. { "1": { "floor": "1.0.0" } }`);
@@ -52,6 +57,7 @@ export function validateConfig(raw: unknown, source = "config"): Config {
     majors: majors as Config["majors"],
     runtimeImport: c.runtimeImport as string | undefined,
     gate: c.gate as GateMode | undefined,
+    generator: c.generator as GeneratorName | undefined,
   };
 }
 
