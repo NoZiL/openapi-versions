@@ -9,18 +9,19 @@ file=$(jq -r '.tool_input.file_path // empty')
 # Skip files outside any worktree of this repository.
 dir=$(dirname "$file")
 root=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null) && [ -n "$root" ] || exit 0
+# Pass Biome a path relative to that top level: always under its root, even when
+# file_path is relative or goes through a symlink (git resolves both).
+rel="$(git -C "$dir" rev-parse --show-prefix)$(basename "$file")" || exit 0
 common() { git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null; }
 c=$(common "$dir") && [ -n "$c" ] && [ "$c" = "$(common "$project")" ] || exit 0
 cd "$root" || exit 0
 # A worktree without `pnpm install` has no Biome: skip rather than report a lint failure.
 [ -x node_modules/.bin/biome ] || exit 0
-# git resolves symlinks in the top level; resolve the file too so it stays under it.
-file="$(cd "$dir" && pwd -P)/$(basename "$file")"
 flags="--no-errors-on-unmatched --files-ignore-unknown=true --colors=off"
 # Fixes cascade (organizeImports then formatting) and Biome needs two passes to converge;
 # then a plain check reports what is left.
-pnpm exec biome check --write $flags "$file" >/dev/null 2>&1
-pnpm exec biome check --write $flags "$file" >/dev/null 2>&1
-out=$(pnpm exec biome check $flags "$file" 2>&1) && exit 0
+pnpm exec biome check --write $flags "$rel" >/dev/null 2>&1
+pnpm exec biome check --write $flags "$rel" >/dev/null 2>&1
+out=$(pnpm exec biome check $flags "$rel" 2>&1) && exit 0
 printf 'Biome found problems in %s that need a manual fix:\n%s\n' "$file" "$out" >&2
 exit 2

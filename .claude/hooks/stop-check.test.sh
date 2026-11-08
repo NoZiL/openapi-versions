@@ -109,14 +109,17 @@ n=$(runs)
 # A cwd outside any work tree (a plain directory, a .git dir, a removed directory): exit 0 quietly, no checks.
 echo edit >> work.txt
 mkdir "$tmp/outside"
-for dir in "$tmp/outside" "$repo/.git" "$tmp/missing"; do
+# An empty cwd must not fall back to the process cwd ($repo here).
+for dir in "$tmp/outside" "$repo/.git" "$tmp/missing" ""; do
+  label=${dir:-/empty}
+  label=$(basename "$label")
   n=$(runs)
   rc=0
   (cd "$repo" && printf '{"cwd":"%s"}' "$dir" | sh "$hook" > "$tmp/out" 2> "$tmp/err") || rc=$?
   if [ "$rc" = 0 ] && [ "$(runs)" = "$n" ] && [ ! -s "$tmp/out" ] && [ ! -s "$tmp/err" ]; then
-    echo "ok   cwd not in a work tree ($(basename "$dir")): exits quietly"
+    echo "ok   cwd not in a work tree ($label): exits quietly"
   else
-    echo "FAIL cwd not in a work tree ($(basename "$dir")): rc=$rc, stdout=$(cat "$tmp/out"), stderr=$(cat "$tmp/err")"
+    echo "FAIL cwd not in a work tree ($label): rc=$rc, stdout=$(cat "$tmp/out"), stderr=$(cat "$tmp/err")"
     fails=$((fails + 1))
   fi
 done

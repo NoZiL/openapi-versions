@@ -8,7 +8,8 @@ input=$(cat)
 
 # Work in the session's checkout (hook input cwd), from its top level.
 # Outside a work tree, rev-parse prints nothing and `cd ""` would succeed: guard it.
-cd "$(printf '%s' "$input" | jq -r '.cwd // "."')" 2>/dev/null || exit 0
+cwd=$(printf '%s' "$input" | jq -r '.cwd // "."' 2>/dev/null) && [ -n "$cwd" ] || exit 0
+cd "$cwd" 2>/dev/null || exit 0
 top=$(git rev-parse --show-toplevel 2>/dev/null) && [ -n "$top" ] && cd "$top" || exit 0
 base=origin/main
 git rev-parse --verify -q "$base" >/dev/null || base=main
