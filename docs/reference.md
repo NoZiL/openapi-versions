@@ -39,7 +39,7 @@ Exit code 1 on: invalid config, missing floor spec, any breaking pair, and (with
 
 Apps rarely call `createVersionAware` themselves: the generated `client.ts` does, with the app's types. Peers: `openapi-typescript`, `openapi-fetch`, and optionally `openapi-react-query`, `@tanstack/react-query`, `react`.
 
-In this repo: `pnpm codegen`, `pnpm check:breaking`, `pnpm build` (bundles with tsup into `dist/`).
+In this repo: `pnpm codegen`, `pnpm check:breaking`, `pnpm build` (bundles with tsdown into `dist/`).
 
 ## Programmatic API
 
