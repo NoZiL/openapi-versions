@@ -10,18 +10,21 @@ root="$(cd "$(dirname "$0")/../.." && pwd)"
 fails=0
 
 # The cache assumes check:fast regenerates both generated dirs before typecheck and
-# test read them (ADRs 0015, 0020): that holds only through these mise depends.
-# Checked against the real mise.toml, before the stub replaces mise.
-# want_deps <task> <expected depends, sorted, space-separated>
-want_deps() {
-  got=$(mise -C "$root" tasks info "$1" --json | jq -r '.depends[]' | sort | tr '\n' ' ')
-  if [ "$got" = "$2 " ]; then echo "ok   mise $1 depends on: $2"
-  else echo "FAIL mise $1 depends on '$got', expected '$2'"; fails=$((fails + 1)); fi
+# test read them, and that typecheck and test run no codegen of their own (ADRs
+# 0015, 0020): that holds only through these mise depends and run lines. Checked
+# against the real mise.toml, before the stub replaces mise.
+tasks=$(mise -C "$root" tasks ls --json 2>/dev/null \
+  | jq -r '.[] | "\(.name) depends=\(.depends // [] | sort | join(",")) run=\(.run // [] | join(";"))"' 2>/dev/null) || tasks=""
+# want_task <task> <expected "depends=... run=..." line>
+want_task() {
+  got=$(printf '%s\n' "$tasks" | grep "^$1 " || true)
+  if [ "$got" = "$1 $2" ]; then echo "ok   mise $1: $2"
+  else echo "FAIL mise $1: got '${got#"$1 "}', expected '$2'"; fails=$((fails + 1)); fi
 }
-want_deps check:fast "lint test typecheck"
-want_deps typecheck "codegen"
-want_deps codegen "codegen:playground codegen:test"
-want_deps test "codegen:test"
+want_task check:fast "depends=lint,test,typecheck run="
+want_task typecheck "depends=codegen run=pnpm typecheck:tsc"
+want_task codegen "depends=codegen:playground,codegen:test run="
+want_task test "depends=codegen:test run=pnpm test:run"
 
 tmp=$(mktemp -d)
 trap 'chmod -R u+rwx "$tmp" 2>/dev/null; rm -rf "$tmp"' EXIT
@@ -129,12 +132,12 @@ hint() {
   unset CHECK_RC OUT
   r=$(jq -r .reason "$tmp/out")
   case "$3" in
-    none) printf '%s' "$r" | grep -q '^mise run check:fast failed' && ! printf '%s' "$r" | grep -q 'run \(pnpm\|mise\) install' ;;
+    none) printf '%s' "$r" | grep -q '^mise run check:fast failed' && ! printf '%s' "$r" | grep -qE 'run (pnpm|mise) install' ;;
     *) printf '%s' "$r" | grep -qF "$3" ;;
   esac && echo "ok   hint: $1" || { echo "FAIL hint: $1: $r"; fails=$((fails + 1)); }
 }
 hint "pnpm deps out of date" " ERR_PNPM_VERIFY_DEPS_BEFORE_RUN  Cannot run" "no node_modules, or package.json, pnpm-lock.yaml or pnpm-workspace.yaml changed since the last install): run pnpm install."
-hint "tool not in mise.lock" "actionlint@1.7.11 is not in the lockfile" "not in mise.lock, so mise did not install it: run mise install"
+hint "tool not in mise.lock" "mise WARN  Failed to resolve tool version list for actionlint: [--runtime] actionlint@1.7.11: actionlint@1.7.11 is not in the lockfile" "mise could not install a tool from mise.lock"
 hint "other failure" "error TS2322" none
 
 # The hook works in the hook input's cwd, not the process cwd.
@@ -183,6 +186,14 @@ rc=0
 echo 'not json' | sh "$hook" > "$tmp/out" 2> "$tmp/err" || rc=$?
 if [ "$rc" = 0 ] && [ "$(runs)" = "$n" ] && [ ! -s "$tmp/out" ] && [ ! -s "$tmp/err" ]; then echo "ok   invalid input: exits quietly"
 else echo "FAIL invalid input: rc=$rc, stdout=$(cat "$tmp/out"), stderr=$(cat "$tmp/err")"; fails=$((fails + 1)); fi
+
+# No jq on PATH: a non-blocking error that says why, no checks.
+n=$(runs)
+mkdir "$tmp/empty"
+rc=0
+echo '{}' | PATH="$tmp/empty" /bin/sh "$hook" > "$tmp/out" 2> "$tmp/err" || rc=$?
+if [ "$rc" = 1 ] && [ "$(runs)" = "$n" ] && grep -q 'jq not found' "$tmp/err"; then echo "ok   no jq: says so, exit 1"
+else echo "FAIL no jq: rc=$rc, stderr=$(cat "$tmp/err")"; fails=$((fails + 1)); fi
 
 n=$(runs)
 echo '{"stop_hook_active":true}' | sh "$hook" > /dev/null

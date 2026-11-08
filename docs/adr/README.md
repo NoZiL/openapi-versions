@@ -7,7 +7,7 @@ One file per decision, `NNNN-title.md`, [MADR](https://adr.github.io/madr/) styl
 Accepted ADRs are immutable. To change one, add a new ADR that either:
 
 - **supersedes** it: the new ADR replaces the whole decision. Set the old one's status to `superseded by NNNN` (the only edit an accepted ADR gets).
-- **amends** it: the new ADR changes or extends part of the decision and the rest still stands. The amending ADR names the ADR and the part it changes on an `- Amends:` line under its status. The amended ADR is not edited; its row in the index below gets `amended by NNNN` in the status column, so a reader of the old ADR finds the change from here. Read an amended ADR together with its amendments.
+- **amends** it: the new ADR changes or extends part of the decision and the rest still stands. The amending ADR names the ADR and the part it changes on an `- Amends:` line under its status (ADRs before 0022 say it in the title or the first sentence of Context instead). The amended ADR is not edited; its row in the index below gets `amended by NNNN` in the status column, so a reader of the old ADR finds the change from here. Read an amended ADR together with its amendments.
 
 ## When to write one
 

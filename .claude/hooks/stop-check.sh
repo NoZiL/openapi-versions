@@ -3,6 +3,9 @@
 # red (lint, typecheck, test), skipping the checks if their inputs are unchanged
 # since the last green run (ADRs 0013, 0015). oasdiff and build stay CI-only (ADR 0004).
 # stop_hook_active is true on the retry after a block, so we never loop.
+# jq parses the input: without it every check below would be skipped unnoticed.
+# Exit 1 is a non-blocking error that Claude Code shows the user.
+command -v jq >/dev/null 2>&1 || { echo "stop-check: jq not found on PATH; checks skipped (mise install)" >&2; exit 1; }
 input=$(cat)
 [ "$(printf '%s' "$input" | jq -r '.stop_hook_active // false' 2>/dev/null)" = "true" ] && exit 0
 
@@ -84,8 +87,10 @@ if [ -z "$k" ] || [ "$(cat "$cache" 2>/dev/null)" != "$k" ]; then
     printf '%s' "$out" | grep -q ERR_PNPM_VERIFY_DEPS_BEFORE_RUN \
       && hint="Dependencies not installed or out of date (no node_modules, or package.json, pnpm-lock.yaml or pnpm-workspace.yaml changed since the last install): run pnpm install.
 "
-    printf '%s' "$out" | grep -q 'is not in the lockfile' \
-      && hint="${hint}A tool version in mise.toml is not in mise.lock, so mise did not install it: run mise install (it updates mise.lock).
+    # Locked, mise skips a tool whose version (or this platform's URL) mise.lock
+    # lacks. That may be unrelated to the failure, so the hint says "if".
+    printf '%s' "$out" | grep -qE '^mise (WARN|ERROR).*lockfile' \
+      && hint="${hint}mise could not install a tool from mise.lock (version or platform missing). If the failure comes from a missing tool, run mise install (it updates mise.lock).
 "
     reasons="${reasons:+$reasons
 

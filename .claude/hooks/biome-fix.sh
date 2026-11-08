@@ -24,11 +24,16 @@ root=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null) && [ -n "$root" ] ||
 # name starting with - a path for any tool (Biome 2.6 already accepts one).
 prefix=$(git -C "$dir" rev-parse --show-prefix 2>/dev/null) || exit 0
 rel="./$prefix$(basename "$file")"
-common() { git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null; }
-# --path-format needs git 2.31. If the project itself has no common dir (older git,
-# or CLAUDE_PROJECT_DIR not in a repository), every file would be skipped: say so.
+# The common dir, absolute and resolved, from the top level (older git prints
+# --git-common-dir relative to it; --path-format=absolute needs git 2.31).
+common() {
+  (t=$(git -C "$1" rev-parse --show-toplevel 2>/dev/null) && cd "$t" \
+    && cd "$(git rev-parse --git-common-dir)" 2>/dev/null && pwd -P)
+}
+# A CLAUDE_PROJECT_DIR outside any repository would skip every file. Say so on
+# stderr (exit 0: Claude Code shows it in the transcript view only).
 pc=$(common "$project") && [ -n "$pc" ] || {
-  echo "biome-fix: skipped $file: no git common dir for $project (not a repository, or git < 2.31)" >&2
+  echo "biome-fix: skipped $file: CLAUDE_PROJECT_DIR ($project) is not in a git repository" >&2
   exit 0
 }
 c=$(common "$dir") && [ -n "$c" ] && [ "$c" = "$pc" ] || exit 0
