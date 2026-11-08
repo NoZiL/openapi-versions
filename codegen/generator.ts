@@ -7,7 +7,7 @@ import { openEnums, openEnumsIr } from "./open-enums";
 
 export type GeneratorName = "openapi-typescript" | "openapi-typesafe";
 /** Auto-detection order: the first installed one wins. */
-export const GENERATORS = ["openapi-typescript", "openapi-typesafe"] as const satisfies readonly GeneratorName[];
+export const GENERATORS: readonly GeneratorName[] = ["openapi-typescript", "openapi-typesafe"];
 
 export interface Generator {
   name: GeneratorName;
@@ -19,7 +19,7 @@ const INSTALL_HINT =
   "Install one as a dev dependency: `npm i -D openapi-typescript` (the default) or `npm i -D openapi-typesafe` (TypeScript 5.4 to 7, no helpers patch, Node 22.12+). See ADR 0017.";
 
 /** Resolves the configured generator, or detects the installed one. */
-export const loadGenerator = (name?: GeneratorName) => selectGenerator(name, tryLoad);
+export const loadGenerator = (name?: GeneratorName): Promise<Generator> => selectGenerator(name, tryLoad);
 
 /** Selection logic, separate from the imports so it can be tested without uninstalling anything. */
 export async function selectGenerator(
@@ -54,7 +54,7 @@ async function tryLoad(name: GeneratorName): Promise<Generator | undefined> {
 }
 
 /** True only when the package itself is missing, not when something it imports is broken. */
-export function isNotInstalled(e: unknown, name: string) {
+export function isNotInstalled(e: unknown, name: string): boolean {
   const err = e as { code?: string; message?: string };
   return (
     (err?.code === "ERR_MODULE_NOT_FOUND" || err?.code === "MODULE_NOT_FOUND") &&
