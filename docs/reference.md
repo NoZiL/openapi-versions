@@ -7,7 +7,7 @@ File: `openapi-versions.config.json`. JSON Schema: [`openapi-versions.schema.jso
 | Key                | Type                                          | Meaning                                                                                                                                                                        |
 | ------------------ | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `specsDir`         | string                                        | Folder of `<semver>.json` specs. Other file names are ignored.                                                                                                                 |
-| `outDir`           | string                                        | Generated output folder. Safe to delete and regenerate. Codegen replaces files in place (atomically, skipping unchanged ones) and removes `v<n>` dirs of majors no longer in `majors`.                                                                                                                        |
+| `outDir`           | string                                        | Generated output folder. Safe to delete and regenerate.                                                                                                                        |
 | `majors`           | object                                        | Keyed by major number (`"1"`). Normally one entry per app release.                                                                                                             |
 | `majors.<n>.floor` | plain semver                                  | Oldest supported minor of major `n`. Must be in major `n` and must have a spec file.                                                                                           |
 | `gate`             | `"auto"` \| `"required"` \| `"off"`, optional | Breaking-change gate. `auto` (default): run oasdiff if installed, otherwise warn and skip. `required`: fail when oasdiff is missing or older than 1.34.0. `off`: never run it. |
@@ -96,6 +96,8 @@ The inputs must be non-breaking relative to each other (step 2); otherwise the u
 | `<outDir>/v<n>/merged.openapi.json` | the merged document (useful to inspect or diff)                                                                                                                                   |
 | `<outDir>/v<n>/client.ts`           | the runtime bound to this major: `ApiVersionProvider`, `useApi`, `useSupports`, `useHasField`, `useSunset`, `Feature`, `createApi`, types `Paths`, `GatedOp`, `GatedField`, `Api` |
 | `<outDir>/index.ts`                 | `majors`, `SupportedMajor`, and `PathsV<n>`, `GatedOpV<n>`, `GatedFieldV<n>` aliases                                                                                              |
+
+Codegen generates everything first, then replaces each file atomically (temp file + rename) and leaves unchanged files untouched, so tools reading `outDir` during a regen never see a missing or half-written file. It deletes the `v<n>` dirs it generated for majors no longer in `majors`; other files in `outDir` are kept.
 
 ## Runtime API
 
