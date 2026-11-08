@@ -24,3 +24,9 @@ run = "pnpm test"
 run = "pnpm check:breaking"
 [tasks.build]
 run = "pnpm build"
+
+[settings]
+# Lock only what we run on (CI + dev machines); every extra platform is another GitHub download that can 504.
+lockfile_platforms = ["linux-x64", "macos-arm64"]
+# GitHub release downloads 504 now and then; retry harder than the default 3.
+http_retries = 8
