@@ -6,6 +6,7 @@ One client build must work against a range of minor versions of one API major. C
 Tooling: `mise install` (node, pnpm, oasdiff from `mise.toml`), then `pnpm install`. `pnpm lint` (biome), `pnpm changeset` for any change to the published package.
 
 - Package `openapi-versions`: runtime (`openapi-versions`, `/core`), codegen (`/codegen`), CLI (`npx openapi-versions`)
+- Stacked PRs (optional, dependent changes): `gh extension install github/gh-stack`, then `gh stack init|add|submit|sync`; merge with `gh stack merge --squash` (repo is squash-only). See ADR 0010.
 - `pnpm codegen` regenerate `playground/generated` and `test/fixtures/generated` (both gitignored) from their `specs/` + `openapi-versions.config.json`
 - `pnpm check:breaking` only the oasdiff gate
 - `pnpm typecheck`, `pnpm test`, `pnpm build` (bundle CLI/API to `dist/`), `pnpm playground` (app), `pnpm playground:api` (CLI demo)

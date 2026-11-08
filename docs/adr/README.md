@@ -13,3 +13,4 @@ One file per decision, `NNNN-title.md`, [MADR](https://adr.github.io/madr/) styl
 | [0007](0007-mit-license.md) | MIT license | accepted |
 | [0008](0008-prereleases-via-snapshots.md) | Prereleases are on-demand snapshots from `main` under the `next` tag | accepted |
 | [0009](0009-direct-publish-trusted-publishing.md) | Publish directly with npm trusted publishing, no staging | accepted |
+| [0010](0010-stacked-prs-gh-stack.md) | Stacked PRs with `gh stack`, squash-merged atomically | proposed |
