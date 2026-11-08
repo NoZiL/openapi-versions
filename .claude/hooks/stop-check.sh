@@ -38,12 +38,18 @@ state=""
 [ -n "$untracked" ] || [ -z "$(git ls-files -o --exclude-standard)" ] \
   && state=$( { git rev-parse HEAD; git diff HEAD; printf '%s\n' "$untracked"; git ls-files -o --exclude-standard; } | shasum | cut -d' ' -f1)
 if [ -z "$state" ] || [ "$(cat "$cache" 2>/dev/null)" != "$state" ]; then
-  if out=$(mise run check:fast 2>&1); then
+  # pnpm re-syncs pnpm-lock.yaml and node_modules before a script when
+  # package.json dependencies differ; fail instead so the hook never edits the tree.
+  if out=$(pnpm_config_verify_deps_before_run=error mise run check:fast 2>&1); then
     [ -z "$state" ] || printf '%s' "$state" > "$cache"
   else
+    hint=""
+    printf '%s' "$out" | grep -q ERR_PNPM_VERIFY_DEPS_BEFORE_RUN \
+      && hint="Lockfile or node_modules out of date with package.json: run pnpm install.
+"
     reasons="${reasons:+$reasons
 
-}mise run check:fast failed. Fix it before finishing:
+}${hint}mise run check:fast failed. Fix it before finishing:
 $(printf '%s\n' "$out" | tail -40)"
   fi
 fi
