@@ -44,5 +44,6 @@ Small fixes, dependency bumps and refactors need none. Take the next free number
 | [0018](0018-isolated-declarations-oxc-dts.md) | `.d.ts` from Oxc with `isolatedDeclarations` on `src/` + `codegen/`; explicit public return types; amends 0016 | accepted |
 | [0019](0019-open-enums-ir-node-on-typesafe-path.md) | The openapi-typesafe open-enum transform returns an IR node, not type text; parity ignores `\uXXXX` escaping; amends 0017 | accepted |
 | [0020](0020-check-fast-runs-codegen-once.md) | `check:fast` runs each codegen once as a shared mise dependency; typecheck and test only read; amends 0014, 0015 | accepted, amended by 0021 |
-| [0021](0021-codegen-replaces-files-in-place.md) | Codegen replaces generated files atomically in place, skips unchanged ones, prunes dropped majors; no `rm -rf` first; amends 0020 | accepted |
+| [0021](0021-codegen-replaces-files-in-place.md) | Codegen replaces generated files atomically in place, skips unchanged ones, prunes dropped majors; no `rm -rf` first; amends 0020 | accepted, amended by 0023 |
 | [0022](0022-stop-hook-no-mise-auto-install.md) | Claude Code hooks turn off mise's tool auto-install (`MISE_AUTO_INSTALL=false`) so `mise.lock` is never rewritten; the Stop hook blocks on missing project tools before the checks; lockfile guards stay in the hooks; amends 0014 | accepted |
+| [0023](0023-codegen-write-lock.md) | Codegen holds a lock file in `outDir` while writing and stages every changed file before renaming any; amends 0021 | accepted |
