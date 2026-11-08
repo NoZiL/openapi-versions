@@ -15,3 +15,4 @@ One file per decision, `NNNN-title.md`, [MADR](https://adr.github.io/madr/) styl
 | [0009](0009-direct-publish-trusted-publishing.md) | Publish directly with npm trusted publishing, no staging | accepted |
 | [0010](0010-stacked-prs-gh-stack.md) | Stacked PRs with `gh stack`, squash-merged atomically | proposed |
 | [0011](0011-main-branch-ruleset.md) | Protect `main` with a ruleset: PR and `check` required, admin bypass via PR only | accepted |
+| [0012](0012-typescript-range-follows-openapi-typescript.md) | `typescript` range follows `openapi-typescript`'s peer range; no peer overrides | accepted |
