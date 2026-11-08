@@ -43,9 +43,13 @@ if [ -z "$state" ] || [ "$(cat "$cache" 2>/dev/null)" != "$state" ]; then
   if out=$(pnpm_config_verify_deps_before_run=error mise run check:fast 2>&1); then
     [ -z "$state" ] || printf '%s' "$state" > "$cache"
   else
+    hint=""
+    printf '%s' "$out" | grep -q ERR_PNPM_VERIFY_DEPS_BEFORE_RUN \
+      && hint="Lockfile or node_modules out of date with package.json: run pnpm install.
+"
     reasons="${reasons:+$reasons
 
-}mise run check:fast failed. Fix it before finishing:
+}${hint}mise run check:fast failed. Fix it before finishing:
 $(printf '%s\n' "$out" | tail -40)"
   fi
 fi
