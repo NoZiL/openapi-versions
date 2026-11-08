@@ -1,12 +1,12 @@
 /**
- * Version-aware codegen around openapi-typescript.
+ * Version-aware codegen around openapi-typescript or openapi-typesafe (ADR 0017).
  *
  *   specs/<semver>.json  ──►  per major:
  *     1. keep specs >= floor (from openapi-versions.config.json)
  *     2. oasdiff: every consecutive pair must be non-breaking  (fails the build otherwise)
  *     3. tolerant merge (union / required ∩ / enum ∪)
  *     4. since maps for operations and fields introduced after the floor
- *     5. openapi-typescript on the merged doc, with open enums
+ *     5. the generator on the merged doc, with open enums
  *
  *   output: <outDir>/v<major>/{schema.d.ts, meta.ts, merged.openapi.json} + <outDir>/index.ts
  *
@@ -14,12 +14,11 @@
  */
 import fs from "node:fs";
 import path from "node:path";
-import openapiTS, { astToString } from "openapi-typescript";
 import semver from "semver";
 import { type BreakingResult, checkChain, probeOasdiff } from "./breaking";
 import { type Config, DEFAULT_RUNTIME_IMPORT, type GateMode } from "./config";
+import { loadGenerator } from "./generator";
 import { mergeAll } from "./merge";
-import { openEnums } from "./open-enums";
 import { computeSince, type VersionedDoc } from "./since";
 
 /** One major in the codegen report: the specs merged and the oasdiff result for each consecutive pair. */
@@ -49,6 +48,9 @@ export async function build(
   } else if (checkOnly) {
     throw new Error(`--check-only needs the gate, but "gate" is "off"`);
   }
+
+  // loaded up front so a missing generator fails before anything is written; --check-only does not need one
+  const generator = checkOnly ? undefined : await loadGenerator(config.generator);
 
   const files = fs
     .readdirSync(config.specsDir)
@@ -90,8 +92,7 @@ export async function build(
     fs.mkdirSync(out, { recursive: true });
     fs.writeFileSync(path.join(out, "merged.openapi.json"), `${JSON.stringify(merged, null, 2)}\n`);
 
-    const ast = await openapiTS(merged, { transform: openEnums, silent: true });
-    fs.writeFileSync(path.join(out, "schema.d.ts"), astToString(ast));
+    fs.writeFileSync(path.join(out, "schema.d.ts"), await generator!.generate(merged));
 
     const meta = { major, floor, newest: group.at(-1)!.version, specs: group.map((g) => g.version), ops, gatedOps, gatedFields };
     fs.writeFileSync(
@@ -104,7 +105,7 @@ export async function build(
     );
     fs.writeFileSync(path.join(out, "client.ts"), clientSource(config.runtimeImport ?? DEFAULT_RUNTIME_IMPORT));
     log(
-      `gen  v${major}: ${meta.specs.join(", ")} -> ${out} (${Object.keys(gatedOps).length} gated ops, ${Object.keys(gatedFields).length} gated fields)`,
+      `gen  v${major}: ${meta.specs.join(", ")} -> ${out} with ${generator!.name} (${Object.keys(gatedOps).length} gated ops, ${Object.keys(gatedFields).length} gated fields)`,
     );
   }
 

@@ -11,6 +11,7 @@ File: `openapi-versions.config.json`. JSON Schema: [`openapi-versions.schema.jso
 | `majors`           | object                                        | Keyed by major number (`"1"`). Normally one entry per app release.                                                                                                             |
 | `majors.<n>.floor` | plain semver                                  | Oldest supported minor of major `n`. Must be in major `n` and must have a spec file.                                                                                           |
 | `gate`             | `"auto"` \| `"required"` \| `"off"`, optional | Breaking-change gate. `auto` (default): run oasdiff if installed, otherwise warn and skip. `required`: fail when oasdiff is missing or older than 1.34.0. `off`: never run it. |
+| `generator`        | `"openapi-typescript"` \| `"openapi-typesafe"`, optional | Generator that writes `schema.d.ts`. Default: the one installed; openapi-typescript if both are. openapi-typesafe supports TypeScript 5.4 to 7 and needs no helpers patch ([ADR 0017](adr/0017-support-openapi-typescript-and-openapi-typesafe.md)). |
 | `runtimeImport`    | string, optional                              | Module the generated `client.ts` imports the runtime from. Default `openapi-versions`. A relative path when developing the runtime in the same repo.                           |
 
 ## CLI
@@ -25,7 +26,7 @@ openapi-versions [--config <path>] [--check-only] [--require-gate]
 | `--check-only`   | Run only the oasdiff gate; write nothing. Fails if oasdiff is missing.                                          |
 | `--require-gate` | Fail when oasdiff is missing or too old, instead of skipping the gate. Same as `"gate": "required"`. Use in CI. |
 
-Exit code 1 on: invalid config, missing floor spec, any breaking pair, and (with `--require-gate`, `"gate": "required"` or `--check-only`) a missing or too-old oasdiff (minimum 1.34.0). Environment: `OASDIFF_BIN` overrides the oasdiff binary.
+Exit code 1 on: invalid config, no generator installed (or the configured one missing), missing floor spec, any breaking pair, and (with `--require-gate`, `"gate": "required"` or `--check-only`) a missing or too-old oasdiff (minimum 1.34.0). Environment: `OASDIFF_BIN` overrides the oasdiff binary.
 
 ## Package entry points
 
@@ -56,7 +57,9 @@ const report = await build(loadConfig("openapi-versions.config.json"), { checkOn
 | `mergeAll(docs)` / `mergeTolerant(a, b)`   | Tolerant merge of OpenAPI documents.                                                 |
 | `computeSince(docs, floor)`                | `{ ops, gatedOps, gatedFields }`                                                     |
 | `checkChain(files)` / `checkPair(a, b)`    | oasdiff gate.                                                                        |
+| `loadGenerator(name?)`                     | Configured or installed generator: `{ name, generate(doc) }` returning `schema.d.ts` text. |
 | `openEnums`                                | openapi-typescript `transform` hook for `x-extensible-enum`.                         |
+| `openEnumsIr`                              | Same hook for openapi-typesafe with `irCallbacks: true` (returns type text).         |
 
 ## Pipeline, per major
 
