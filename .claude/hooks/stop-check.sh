@@ -7,7 +7,10 @@ input=$(cat)
 [ "$(printf '%s' "$input" | jq -r '.stop_hook_active // false')" = "true" ] && exit 0
 
 # Work in the session's checkout (hook input cwd), from its top level.
-cd "$(printf '%s' "$input" | jq -r '.cwd // "."')" && cd "$(git rev-parse --show-toplevel)" || exit 0
+# Outside a work tree, rev-parse prints nothing and `cd ""` would succeed: guard it.
+cwd=$(printf '%s' "$input" | jq -r '.cwd // "."' 2>/dev/null) && [ -n "$cwd" ] || exit 0
+cd "$cwd" 2>/dev/null || exit 0
+top=$(git rev-parse --show-toplevel 2>/dev/null) && [ -n "$top" ] && cd "$top" || exit 0
 base=origin/main
 git rev-parse --verify -q "$base" >/dev/null || base=main
 mb=$(git merge-base HEAD "$base" 2>/dev/null) || exit 0
@@ -43,8 +46,13 @@ inputs() {
     && hash_files node_modules/.pnpm/lock.yaml) || return 0
   printf '%s' "$s" | shasum | cut -d' ' -f1
 }
-hash_files() {
-  find "$@" -type f -print0 2>/dev/null | LC_ALL=C sort -z | xargs -0 shasum
+hash_files() { # <path>...: missing paths are skipped; a find, shasum or sort error fails the hash
+  for p; do shift; [ -e "$p" ] && set -- "$@" "$p"; done
+  [ $# -gt 0 ] || return 0
+  # No pipefail in sh: capture first so a failed traversal (a directory removed
+  # or unreadable midway) or a failed shasum is not hashed as a subset.
+  h=$(find "$@" -type f -exec shasum {} + 2>/dev/null) || return 1
+  printf '%s\n' "$h" | LC_ALL=C sort
 }
 key() { # <inputs hash>: empty if the inputs hash is empty
   [ -n "$1" ] || return 0
