@@ -38,7 +38,9 @@ state=""
 [ -n "$untracked" ] || [ -z "$(git ls-files -o --exclude-standard)" ] \
   && state=$( { git rev-parse HEAD; git diff HEAD; printf '%s\n' "$untracked"; git ls-files -o --exclude-standard; } | shasum | cut -d' ' -f1)
 if [ -z "$state" ] || [ "$(cat "$cache" 2>/dev/null)" != "$state" ]; then
-  if out=$(mise run check:fast 2>&1); then
+  # pnpm re-syncs pnpm-lock.yaml and node_modules before a script when
+  # package.json dependencies differ; fail instead so the hook never edits the tree.
+  if out=$(pnpm_config_verify_deps_before_run=error mise run check:fast 2>&1); then
     [ -z "$state" ] || printf '%s' "$state" > "$cache"
   else
     reasons="${reasons:+$reasons

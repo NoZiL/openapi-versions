@@ -17,3 +17,4 @@ One file per decision, `NNNN-title.md`, [MADR](https://adr.github.io/madr/) styl
 | [0011](0011-main-branch-ruleset.md) | Protect `main` with a ruleset: PR and `check` required, admin bypass via PR only | accepted |
 | [0012](0012-typescript-range-follows-openapi-typescript.md) | `typescript` range follows `openapi-typescript`'s peer range; no peer overrides | accepted |
 | [0013](0013-stop-hook-adr-and-check.md) | Claude Code Stop hook blocks once on missing ADR or red lint/typecheck/test | accepted |
+| [0014](0014-stop-hook-never-rewrites-lockfile.md) | Stop hook fails instead of re-syncing the lockfile; amends 0013 | accepted |
