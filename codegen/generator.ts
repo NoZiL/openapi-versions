@@ -7,7 +7,7 @@ import { openEnums, openEnumsIr } from "./open-enums";
 
 export type GeneratorName = "openapi-typescript" | "openapi-typesafe";
 /** Auto-detection order: the first installed one wins. */
-export const GENERATORS: GeneratorName[] = ["openapi-typescript", "openapi-typesafe"];
+export const GENERATORS = ["openapi-typescript", "openapi-typesafe"] as const satisfies readonly GeneratorName[];
 
 export interface Generator {
   name: GeneratorName;

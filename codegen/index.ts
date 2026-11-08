@@ -5,5 +5,5 @@ export { BreakingChangeError, build, type MajorReport } from "./build";
 export { type Config, type GateMode, loadConfig, validateConfig } from "./config";
 export { GENERATORS, type Generator, type GeneratorName, loadGenerator } from "./generator";
 export { mergeAll, mergeTolerant } from "./merge";
-export { openEnums, openEnumsIr } from "./open-enums";
+export { openEnums } from "./open-enums";
 export { computeSince, type SinceResult, type VersionedDoc } from "./since";

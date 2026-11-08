@@ -1,7 +1,6 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import { build } from "../codegen/build";
 import { validateConfig } from "../codegen/config";
@@ -14,32 +13,32 @@ const generate = async (generator: "openapi-typescript" | "openapi-typesafe", sp
   await build({ specsDir, outDir, majors: { [floor.split(".")[0]]: { floor } }, generator, gate: "off" }, { log: () => {} });
   return fs.readFileSync(path.join(outDir, `v${floor.split(".")[0]}`, "schema.d.ts"), "utf8");
 };
-const withoutHeader = (s: string) => s.replace(/^\/\*\*[\s\S]*?\*\/\n/, "");
+// openapi-typescript's printer escapes non-ASCII ("caf\u00E9"), openapi-typesafe's does not ("café"): same type
+const normalize = (s: string) =>
+  s.replace(/^\/\*\*[\s\S]*?\*\/\n/, "").replace(/\\u([0-9A-Fa-f]{4})/g, (_, hex) => String.fromCharCode(Number.parseInt(hex, 16)));
 
 describe("generator parity", () => {
   it.each([
     ["test/fixtures/specs", "1.3.0"],
     ["playground/specs", "1.3.0"],
+    // extensible enums inside arrays, allOf and nullable anyOf, nullable, and values that need escaping
+    ["test/fixtures/enum-shapes", "1.0.0"],
   ])("openapi-typescript and openapi-typesafe write the same schema.d.ts for %s", async (specsDir, floor) => {
     const [a, b] = await Promise.all([generate("openapi-typescript", specsDir, floor), generate("openapi-typesafe", specsDir, floor)]);
     expect(a).toMatch(/\| \(string & \{\}\)/);
-    expect(withoutHeader(b)).toBe(withoutHeader(a));
+    expect(normalize(b)).toBe(normalize(a));
   });
 
-  it.each([
-    { type: "string", "x-extensible-enum": ["active", "invited"] },
-    { type: ["string", "null"], "x-extensible-enum": ["a"] },
-    { type: "string", "x-extensible-enum": ['quo"te', "back\\slash", "new\nline"] },
-  ])("open enum text matches the TS-node form: %j", (schema) => {
-    const node = openEnums(schema as never, {} as never) as ts.TypeNode;
-    const printed = ts.createPrinter().printNode(ts.EmitHint.Unspecified, node, ts.createSourceFile("x.ts", "", ts.ScriptTarget.Latest));
-    expect(openEnumsIr(schema)).toBe(printed);
+  it("parenthesizes an open enum inside an array or intersection", async () => {
+    const out = await generate("openapi-typesafe", "test/fixtures/enum-shapes", "1.0.0");
+    expect(out).toContain(`list?: ("a" | "b" | (string & {}))[];`);
+    expect(out).toContain(`composed?: ("a" | "b" | (string & {})) & unknown;`);
   });
 
   it("leaves other schemas to the generator", () => {
     for (const schema of [{ type: "string", enum: ["a"] }, { type: "integer", "x-extensible-enum": [1] }, { type: "string" }]) {
       expect(openEnumsIr(schema)).toBeUndefined();
-      expect(openEnums(schema as never, {} as never)).toBeUndefined();
+      expect(openEnums(schema)).toBeUndefined();
     }
   });
 });

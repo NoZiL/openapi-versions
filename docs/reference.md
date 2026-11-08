@@ -38,7 +38,7 @@ Exit code 1 on: invalid config, no generator installed (or the configured one mi
 | `openapi-versions/schema.json` | JSON Schema of the config                                                                                                      |
 | `npx openapi-versions`         | The CLI                                                                                                                        |
 
-Apps rarely call `createVersionAware` themselves: the generated `client.ts` does, with the app's types. Peers: `openapi-typescript`, `openapi-fetch`, and optionally `openapi-react-query`, `@tanstack/react-query`, `react`.
+Apps rarely call `createVersionAware` themselves: the generated `client.ts` does, with the app's types. Peers: `openapi-fetch`, one generator for codegen (`openapi-typescript` or `openapi-typesafe`, both optional peers: install the one you use), and optionally `openapi-react-query`, `@tanstack/react-query`, `react`.
 
 In this repo: `pnpm codegen`, `pnpm check:breaking`, `pnpm build` (bundles with tsdown into `dist/`).
 
@@ -59,7 +59,6 @@ const report = await build(loadConfig("openapi-versions.config.json"), { checkOn
 | `checkChain(files)` / `checkPair(a, b)`    | oasdiff gate.                                                                        |
 | `loadGenerator(name?)`                     | Configured or installed generator: `{ name, generate(doc) }` returning `schema.d.ts` text. |
 | `openEnums`                                | openapi-typescript `transform` hook for `x-extensible-enum`.                         |
-| `openEnumsIr`                              | Same hook for openapi-typesafe with `irCallbacks: true` (returns type text).         |
 
 ## Pipeline, per major
 
@@ -67,7 +66,7 @@ const report = await build(loadConfig("openapi-versions.config.json"), { checkOn
 2. `oasdiff breaking <prev> <next> --fail-on ERR` for each consecutive pair.
 3. Tolerant merge (rules below). `info.version` of the merged doc becomes `"<floor> - <newest>"`.
 4. Since maps.
-5. `openapi-typescript` on the merged doc with the `openEnums` transform.
+5. The generator (`openapi-typescript`, or `openapi-typesafe` with `irCallbacks`) on the merged doc, with the open-enum transform.
 
 ## Merge rules
 
@@ -92,7 +91,7 @@ The inputs must be non-breaking relative to each other (step 2); otherwise the u
 
 | File                                | Content                                                                                                                                                                           |
 | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `<outDir>/v<n>/schema.d.ts`         | openapi-typescript types of the merged contract; extensible enums are open unions                                                                                                 |
+| `<outDir>/v<n>/schema.d.ts`         | Types of the merged contract from the chosen generator; extensible enums are open unions                                                                                                |
 | `<outDir>/v<n>/meta.ts`             | `meta = { major, floor, newest, specs, ops, gatedOps, gatedFields }` plus `Op`, `GatedOp`, `GatedField` types                                                                     |
 | `<outDir>/v<n>/merged.openapi.json` | the merged document (useful to inspect or diff)                                                                                                                                   |
 | `<outDir>/v<n>/client.ts`           | the runtime bound to this major: `ApiVersionProvider`, `useApi`, `useSupports`, `useHasField`, `useSunset`, `Feature`, `createApi`, types `Paths`, `GatedOp`, `GatedField`, `Api` |
