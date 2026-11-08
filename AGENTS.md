@@ -22,12 +22,12 @@ Tooling: `mise install` (node, pnpm, oasdiff, actionlint from `mise.toml`), then
 7. Keep the `patches/` fix applied (`pnpm` `patchedDependencies`); without it open enums collapse to `string`. Drop it once openapi-typescript-helpers ships openapi-ts/openapi-typescript#2766.
 
 ## Open work and decisions
-Todos are GitHub Issues (labels in `.github/labels.yml`, `blocked-upstream` for items waiting on openapi-ts). Decisions are ADRs in `docs/adr/` (accepted ones are immutable; supersede, don't edit). Check both before starting; add an ADR when you change a design decision.
+Todos are GitHub Issues (labels in `.github/labels.yml`, `blocked-upstream` for items waiting on openapi-ts). Decisions are ADRs in `docs/adr/` (accepted ones are immutable; supersede, don't edit). Check both before starting; read `docs/adr/README.md` before writing one. Add an ADR (or supersede one) when a change adds a tool or dependency, changes CI, release or security policy, changes the public API or the gating model, or reverses an earlier ADR. Small fixes, dependency bumps and refactors need none.
 
 ## Session scope
 One issue per session and per PR. Do what the issue asks; log out-of-scope findings as new issues instead of fixing them in place. Plan first for anything non-trivial. Delegate broad searches to subagents. After opening a PR, or when context gets heavy, run `/wrap-up` (handoff note in the issue) and start a fresh session. The project status line shows context usage, and a hook flags the session at 70% context or 5 commits ahead of `main`.
 
-Before opening a PR that changes code or tooling, get an independent review: `git fetch`, then run `/code-review high origin/main...HEAD` (the whole PR range, not one commit; use the base branch instead of `origin/main` for a stacked PR). Docs-only PRs can skip it. Also check the issue's "done when" list, run what the PR claims to have tested, and tick the PR template honestly (an ADR if a design decision changed). Fix what the review finds and re-run at most once more, then hand the rest to the human. Merging stays human-gated.
+Before opening a PR that changes code or tooling, get an independent review: `git fetch`, then run `/code-review high origin/main...HEAD` (the whole PR range, not one commit; use the base branch instead of `origin/main` for a stacked PR). Docs-only PRs can skip it. Also check the issue's "done when" list, run what the PR claims to have tested, and tick the PR template honestly (an ADR if the change hits a trigger above). Fix what the review finds and re-run at most once more, then hand the rest to the human. Merging stays human-gated.
 
 ## Skills
 

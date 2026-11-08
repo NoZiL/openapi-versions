@@ -2,6 +2,19 @@
 
 One file per decision, `NNNN-title.md`, [MADR](https://adr.github.io/madr/) style. Accepted ADRs are immutable: to change a decision, add a new ADR that supersedes it and set the old one's status to `superseded by NNNN`. Copy `template.md`.
 
+## When to write one
+
+Add an ADR, or supersede an existing one, when a change:
+
+- adds a tool or dependency
+- changes CI, release or security policy
+- changes the public API or the gating model
+- reverses an earlier ADR
+
+Small fixes, dependency bumps and refactors need none. Take the next free number on `origin/main` (fetch first).
+
+## Index
+
 | ADR | Decision | Status |
 | --- | --- | --- |
 | [0001](0001-separate-package-not-upstream.md) | Ship as a separate package, upstream only small fixes | accepted |
