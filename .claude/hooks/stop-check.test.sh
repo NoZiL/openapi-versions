@@ -1,7 +1,10 @@
 #!/bin/sh
 # Tests for stop-check.sh's green-run cache (ADR 0015), in a throwaway repo
-# with the checks stubbed. Run: sh .claude/hooks/stop-check.test.sh
+# with `mise` replaced by a stub on PATH. Run: sh .claude/hooks/stop-check.test.sh
 set -eu
+# Isolate from the caller's git config and repo, and from the Claude session's project.
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY CLAUDE_PROJECT_DIR
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 hook="$(cd "$(dirname "$0")" && pwd)/stop-check.sh"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
@@ -19,17 +22,20 @@ echo change > work.txt # the hook does nothing on a branch with no changes
 mkdir -p playground/generated test/fixtures/generated node_modules/.pnpm
 echo gen > playground/generated/a.ts
 echo gen > test/fixtures/generated/b.ts
-echo modules > node_modules/.modules.yaml
 echo lock > node_modules/.pnpm/lock.yaml
 
 # The stub counts runs, runs $DURING (a change made while the checks run) and
 # exits with $CHECK_RC. Export and unset them: `VAR=x func` leaks VAR in POSIX sh.
-cat > "$tmp/check.sh" <<'EOF'
+mkdir "$tmp/bin"
+cat > "$tmp/bin/mise" <<'EOF'
+#!/bin/sh
+[ "$*" = "run check:fast" ] || { echo "unexpected: mise $*" >&2; exit 2; }
 echo run >> "$COUNT"
 [ -z "${DURING:-}" ] || sh -c "$DURING"
 exit "${CHECK_RC:-0}"
 EOF
-export STOP_CHECK_CMD="sh $tmp/check.sh" COUNT="$count"
+chmod +x "$tmp/bin/mise"
+export PATH="$tmp/bin:$PATH" COUNT="$count"
 : > "$count"
 
 fails=0
@@ -52,11 +58,11 @@ expect skipped "hit after the generated change"
 rm -rf test/fixtures/generated
 expect ran "miss: generated dir deleted"
 
-echo modules2 > node_modules/.modules.yaml
+echo lock2 > node_modules/.pnpm/lock.yaml
 expect ran "miss: pnpm install changed node_modules"
 
-echo lock2 > node_modules/.pnpm/lock.yaml
-expect ran "miss: node_modules lockfile changed"
+rm -rf node_modules
+expect ran "miss: node_modules deleted"
 
 # A change during the run: the checks may have seen either state, so neither is
 # recorded as green, even once the tree is back to the state hashed before the run.
@@ -70,9 +76,11 @@ expect ran "change during the run: state before it not recorded as green"
 expect skipped "hit once a run saw the state unchanged"
 
 echo edit >> work.txt
+cp playground/generated/a.ts "$tmp/before"
 export DURING="echo during > $repo/playground/generated/a.ts"
 expect ran "generated dir changed during the run: checks run"
 unset DURING
+cp "$tmp/before" playground/generated/a.ts
 expect ran "generated dir changed during the run: not recorded as green"
 
 echo red >> work.txt
