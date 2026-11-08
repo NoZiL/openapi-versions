@@ -15,8 +15,9 @@ One file per decision, `NNNN-title.md`, [MADR](https://adr.github.io/madr/) styl
 | [0009](0009-direct-publish-trusted-publishing.md) | Publish directly with npm trusted publishing, no staging | accepted |
 | [0010](0010-stacked-prs-gh-stack.md) | Stacked PRs with `gh stack`, squash-merged atomically | proposed |
 | [0011](0011-main-branch-ruleset.md) | Protect `main` with a ruleset: PR and `check` required, admin bypass via PR only | accepted |
-| [0012](0012-typescript-range-follows-openapi-typescript.md) | `typescript` range follows `openapi-typescript`'s peer range; no peer overrides | accepted |
+| [0012](0012-typescript-range-follows-openapi-typescript.md) | `typescript` range follows `openapi-typescript`'s peer range; no peer overrides | superseded by 0017 |
 | [0013](0013-stop-hook-adr-and-check.md) | Claude Code Stop hook blocks once on missing ADR or red lint/typecheck/test | accepted |
 | [0014](0014-stop-hook-never-rewrites-lockfile.md) | Stop hook fails instead of re-syncing the lockfile; amends 0013 | accepted |
 | [0015](0015-stop-hook-cache-key-covers-check-inputs.md) | Stop hook cache key covers installed deps and generated output; cached only if the run left the inputs unchanged; amends 0013 | accepted |
 | [0016](0016-build-with-tsdown.md) | Build with tsdown; `.d.ts` from TypeScript 5, no dev-only TS 7 yet | accepted |
+| [0017](0017-support-openapi-typescript-and-openapi-typesafe.md) | Support openapi-typescript and openapi-typesafe side by side; TS 5.4 to 7 on the typesafe path; amends 0005, supersedes 0012 | accepted |
