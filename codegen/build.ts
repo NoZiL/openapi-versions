@@ -10,7 +10,9 @@
  *
  *   output: <outDir>/v<major>/{schema.d.ts, meta.ts, merged.openapi.json, client.ts} + <outDir>/index.ts
  *   Files are replaced in place, never deleted first, so a concurrent reader (tsc, vitest, vite)
- *   never sees a missing file (ADR 0021).
+ *   never sees a missing file (ADR 0021). The write phase holds a lock file in outDir, so two runs
+ *   on one outDir never interleave their writes, and stages every changed file before renaming any
+ *   (ADR 0023).
  *
  * Library entry: build(config). The CLI lives in cli.ts.
  */
@@ -21,6 +23,7 @@ import semver from "semver";
 import { type BreakingResult, checkChain, probeOasdiff } from "./breaking";
 import { type Config, DEFAULT_RUNTIME_IMPORT, type GateMode } from "./config";
 import { loadGenerator } from "./generator";
+import { withOutDirLock } from "./lock";
 import { mergeAll } from "./merge";
 import { computeSince, type VersionedDoc } from "./since";
 
@@ -95,7 +98,7 @@ export async function build(
 
     const out = path.join(config.outDir, `v${major}`);
     const meta = { major, floor, newest: group.at(-1)!.version, specs: group.map((g) => g.version), ops, gatedOps, gatedFields };
-    // meta.ts first: its header marks the dir as codegen's (pruneDroppedMajors), even if a run dies after it
+    // meta.ts first: its header marks the dir as codegen's (droppedMajors), even if a run dies after it
     writes.push([
       path.join(out, "meta.ts"),
       `${HEADER}\n` +
@@ -127,12 +130,19 @@ export async function build(
         majors.map((m) => `export type { GatedOp as GatedOpV${m}, GatedField as GatedFieldV${m} } from "./v${m}/meta";`).join("\n") +
         "\n",
     ]);
-    for (const dir of new Set(writes.map(([file]) => path.dirname(file)))) {
-      fs.mkdirSync(dir, { recursive: true });
-      removeStaleTemps(dir);
+    // Nothing to change (same generation on disk, nothing to prune): skip the lock too, so a no-op
+    // regen does not touch outDir at all. Otherwise serialize with other codegen runs on this
+    // outDir, so the last one leaves one whole generation (ADR 0023).
+    if (writes.some(([file, content]) => !isSame(file, Buffer.from(content))) || droppedMajors(config.outDir, majors).length) {
+      await withOutDirLock(config.outDir, () => {
+        for (const dir of new Set(writes.map(([file]) => path.dirname(file)))) {
+          fs.mkdirSync(dir, { recursive: true });
+          removeStaleTemps(dir);
+        }
+        writeChanged(writes);
+        for (const dir of droppedMajors(config.outDir, majors)) fs.rmSync(dir, { recursive: true, force: true });
+      });
     }
-    for (const [file, content] of writes) writeIfChanged(file, content);
-    pruneDroppedMajors(config.outDir, majors);
   }
   return report;
 }
@@ -142,8 +152,16 @@ const TEMP = /^\..+\.[0-9a-f-]{36}\.tmp$/;
 const STALE_TEMP_MS = 10 * 60 * 1000;
 
 /** `v<n>` dirs this codegen wrote (their meta.ts has our header) for majors no longer in the config. */
-function pruneDroppedMajors(outDir: string, majors: number[]): void {
-  for (const entry of fs.readdirSync(outDir, { withFileTypes: true })) {
+function droppedMajors(outDir: string, majors: number[]): string[] {
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(outDir, { withFileTypes: true });
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw e;
+  }
+  const dropped: string[] = [];
+  for (const entry of entries) {
     if (!entry.isDirectory() || !/^v\d+$/.test(entry.name) || majors.includes(Number(entry.name.slice(1)))) continue;
     const dir = path.join(outDir, entry.name);
     let meta: string;
@@ -152,8 +170,9 @@ function pruneDroppedMajors(outDir: string, majors: number[]): void {
     } catch {
       continue;
     }
-    if (meta.startsWith(HEADER)) fs.rmSync(dir, { recursive: true, force: true });
+    if (meta.startsWith(HEADER)) dropped.push(dir);
   }
+  return dropped;
 }
 
 /** Temp files left by a codegen killed between write and rename; a live run's temp is seconds old. */
@@ -170,27 +189,60 @@ function removeStaleTemps(dir: string): void {
 }
 
 /**
- * Replaces `file` atomically (temp file + rename in the same dir), and leaves it untouched when the
- * content is the same, so an unchanged regen does not wake file watchers.
+ * Replaces each changed file atomically (temp file + rename in the same dir), and leaves a file
+ * untouched when its content is the same, so an unchanged regen does not wake file watchers.
+ * Every changed file is staged as a temp before any is renamed: an error while staging (disk full,
+ * EACCES) removes the temps and leaves the old output whole. Renames allocate no data, so a
+ * failure among them is unlikely; if one does fail, the rest are not renamed and their temps removed.
  */
-function writeIfChanged(file: string, content: string): void {
-  const bytes = Buffer.from(content);
+function writeChanged(writes: [file: string, content: string][]): void {
+  const staged: { file: string; tmp: string; bytes: Buffer }[] = [];
+  const dropTemps = (from: number) => {
+    for (const { tmp } of staged.slice(from)) fs.rmSync(tmp, { force: true });
+  };
   try {
-    if (fs.statSync(file).size === bytes.length && fs.readFileSync(file).equals(bytes)) return;
+    for (const [file, content] of writes) {
+      const bytes = Buffer.from(content);
+      if (isSame(file, bytes)) continue;
+      // unique per write: concurrent runs (other processes, threads, containers) never share a temp
+      const tmp = path.join(path.dirname(file), `.${path.basename(file)}.${randomUUID()}.tmp`);
+      staged.push({ file, tmp, bytes });
+      fs.writeFileSync(tmp, bytes);
+    }
   } catch (e) {
-    if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+    dropTemps(0);
+    throw e;
   }
-  // unique per write: concurrent runs (other processes, threads, containers) never share a temp
-  const tmp = path.join(path.dirname(file), `.${path.basename(file)}.${randomUUID()}.tmp`);
+  for (const [i, { file, tmp, bytes }] of staged.entries()) {
+    try {
+      replace(file, tmp, bytes);
+    } catch (e) {
+      dropTemps(i);
+      throw e;
+    }
+  }
+}
+
+function isSame(file: string, bytes: Buffer): boolean {
   try {
-    fs.writeFileSync(tmp, bytes);
+    return fs.statSync(file).size === bytes.length && fs.readFileSync(file).equals(bytes);
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    if (code === "ENOENT" || code === "ENOTDIR") return false;
+    throw e;
+  }
+}
+
+function replace(file: string, tmp: string, bytes: Buffer): void {
+  try {
     fs.renameSync(tmp, file);
   } catch (e) {
-    fs.rmSync(tmp, { force: true });
-    // Windows refuses to replace a file another process holds open; fall back to an in-place write
+    // Windows refuses to replace a file another process holds open; fall back to an in-place write.
+    // Only here: a temp that cannot be created is a real error and fails while staging.
     const code = (e as NodeJS.ErrnoException).code;
-    if (process.platform === "win32" && (code === "EPERM" || code === "EBUSY" || code === "EACCES")) fs.writeFileSync(file, bytes);
-    else throw e;
+    if (process.platform !== "win32" || !(code === "EPERM" || code === "EBUSY" || code === "EACCES")) throw e;
+    fs.rmSync(tmp, { force: true });
+    fs.writeFileSync(file, bytes);
   }
 }
 

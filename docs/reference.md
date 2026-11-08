@@ -97,7 +97,7 @@ The inputs must be non-breaking relative to each other (step 2); otherwise the u
 | `<outDir>/v<n>/client.ts`           | the runtime bound to this major: `ApiVersionProvider`, `useApi`, `useSupports`, `useHasField`, `useSunset`, `Feature`, `createApi`, types `Paths`, `GatedOp`, `GatedField`, `Api` |
 | `<outDir>/index.ts`                 | `majors`, `SupportedMajor`, and `PathsV<n>`, `GatedOpV<n>`, `GatedFieldV<n>` aliases                                                                                              |
 
-Codegen generates everything first, then replaces each file atomically (temp file + rename) and leaves unchanged files untouched, so tools reading `outDir` during a regen never see a missing or half-written file. It deletes the `v<n>` dirs it generated for majors no longer in `majors`; other files in `outDir` are kept.
+Codegen generates everything first, then replaces each file atomically (temp file + rename) and leaves unchanged files untouched, so tools reading `outDir` during a regen never see a missing or half-written file. Every changed file is written to a temp file before any is renamed, so a disk-full or permission error while writing leaves the previous output whole. Two codegen runs on the same `outDir` take turns: the write phase holds `<outDir>/.openapi-versions.lock` (milliseconds) and removes it when done; a lock left by a killed run is taken over once its process is gone or it is 30 s old. It deletes the `v<n>` dirs it generated for majors no longer in `majors`; other files in `outDir` are kept.
 
 ## Runtime API
 
