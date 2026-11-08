@@ -75,13 +75,22 @@ cp "$tmp/before" work.txt
 expect ran "change during the run: state before it not recorded as green"
 expect skipped "hit once a run saw the state unchanged"
 
+# The checks regenerate the generated dirs: the key takes them as the run left them.
 echo edit >> work.txt
-cp playground/generated/a.ts "$tmp/before"
-export DURING="echo during > $repo/playground/generated/a.ts"
-expect ran "generated dir changed during the run: checks run"
+export DURING="echo regenerated > $repo/playground/generated/a.ts"
+expect ran "generated dir rewritten by the run: checks run"
 unset DURING
-cp "$tmp/before" playground/generated/a.ts
-expect ran "generated dir changed during the run: not recorded as green"
+expect skipped "generated dir rewritten by the run: hit on the next stop"
+
+mkdir -p sub
+echo edit >> work.txt
+expect ran "change, then a stop from a subdirectory"
+n=$(runs)
+(cd sub && echo '{}' | sh "$hook" > /dev/null)
+[ "$(runs)" = "$n" ] && echo "ok   hit from a subdirectory" || { echo "FAIL subdirectory missed the cache"; fails=$((fails + 1)); }
+
+echo new > untracked.txt
+expect ran "miss: untracked file added"
 
 echo red >> work.txt
 export CHECK_RC=1
