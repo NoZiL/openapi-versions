@@ -9,7 +9,7 @@ Amends [0014](0014-stop-hook-never-rewrites-lockfile.md) and [0015](0015-stop-ho
 
 ## Decision
 
-mise has `codegen:playground` and `codegen:test` tasks. The mise `typecheck` task depends on both and runs `pnpm typecheck:tsc` (`tsc --noEmit`). The mise `test` task depends on `codegen:test` and runs `pnpm test:run` (`vitest run`). mise runs each dependency once per run, before its dependents, so nothing deletes a generated dir while a check reads it. `pnpm typecheck` and `pnpm test` call the same read-only scripts after their own codegen, so CI, manual runs and `check:fast` run the same commands. Every check still goes through a pnpm script, so 0014's `verify-deps-before-run=error` still applies to each one.
+mise has `codegen:playground` and `codegen:test` tasks. The mise `typecheck` task depends on both and runs `pnpm typecheck:tsc` (`tsc --noEmit`). The mise `test` task depends on `codegen:test` and runs `pnpm test:run` (`vitest run`). mise runs each dependency once per run, before its dependents, so nothing deletes a generated dir while a check reads it. `pnpm typecheck` and `pnpm test` call the same read-only scripts after their own codegen, so CI, manual runs and `check:fast` run the same commands. The order differs: `pnpm codegen` runs the two codegens one after the other, and mise runs them in parallel, so neither may read the other's output. Every check still goes through a pnpm script, so 0014's `verify-deps-before-run=error` still applies to each one.
 
 ## Consequences
 

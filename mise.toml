@@ -33,7 +33,7 @@ run = "pnpm codegen:test"
 description = "Regenerate playground/generated and test/fixtures/generated"
 depends = ["codegen:playground", "codegen:test"]
 [tasks.typecheck]
-depends = ["codegen:playground", "codegen:test"]
+depends = ["codegen"]
 run = "pnpm typecheck:tsc"
 [tasks.test]
 depends = ["codegen:test"]
