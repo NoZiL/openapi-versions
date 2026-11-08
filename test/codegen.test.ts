@@ -28,6 +28,31 @@ describe("tolerant merge", () => {
     expect(Object.keys(merged.paths)).toEqual(["/users", "/users/{id}", "/users/{id}/archive", "/users/{id}/activity"]);
     expect(merged.paths["/users"].get.parameters).toEqual([{ name: "search", in: "query", required: false, schema: { type: "string" } }]);
   });
+
+  // #98: 1.0.0 declares Pet.nickname (and tag items) nullable, 1.1.0 drops it; oasdiff does not flag
+  // that, and a backend still on 1.0.0 can send null
+  describe.each([
+    ["test/fixtures/nullable-narrowing", (s: { type?: unknown }) => expect(s.type).toEqual(["string", "null"])],
+    ["test/fixtures/nullable-narrowing-3.0", (s: { nullable?: unknown }) => expect(s.nullable).toBe(true)],
+  ])("keeps a field nullable if an older minor says so (%s)", (dir, expectNullable) => {
+    const docs = ["1.0.0", "1.1.0"].map((v) => load(v, dir).doc);
+
+    it("in the merged spec, whichever order the minors come in", () => {
+      for (const pet of [mergeAll(docs), mergeAll([...docs].reverse())].map((m) => m.components.schemas.Pet)) {
+        expectNullable(pet.properties.nickname);
+        expectNullable(pet.properties.tags.items);
+        expect(pet.properties.id).toEqual({ type: "string" });
+      }
+    });
+
+    it("in the generated types", async () => {
+      const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "openapi-versions-"));
+      await build({ specsDir: dir, outDir, majors: { 1: { floor: "1.0.0" } }, gate: "off" }, { log: () => {} });
+      const schema = fs.readFileSync(path.join(outDir, "v1/schema.d.ts"), "utf8");
+      expect(schema).toMatch(/nickname: string \| null;/);
+      expect(schema).toMatch(/tags\?: \(string \| null\)\[\];/);
+    });
+  });
 });
 
 describe("since maps", () => {

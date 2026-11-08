@@ -6,6 +6,8 @@
  *  - `required` arrays (schema objects):        INTERSECTION
  *  - `required` booleans (params, bodies):      AND (true only if every version says true)
  *  - enums:                                     UNION of values
+ *  - nullability (`nullable`, `"null"` in type): OR (nullable if any version says so), so a backend
+ *    still on an older minor that sends `null` is typed; oasdiff does not flag dropping it
  *  - everything else (descriptions, formats…):  newest wins
  *
  * Inputs MUST be non-breaking relative to each other (checked by oasdiff first),
@@ -34,6 +36,16 @@ export function mergeTolerant(older: Json, newer: Json): Json {
         out.required = mergeRequired(older, newer);
         continue;
       }
+      // OpenAPI 3.0 schema: nullable in any version stays nullable
+      if (key === "nullable" && (older.nullable === true || newer.nullable === true)) {
+        out.nullable = true;
+        continue;
+      }
+      // OpenAPI 3.1 schema: `type: ["string", "null"]` in any version keeps "null"
+      if (key === "type" && (hasNull(older.type) || hasNull(newer.type))) {
+        out.type = mergeType(older.type, newer.type);
+        continue;
+      }
       out[key] = mergeTolerant(older[key], newer[key]);
     }
     if (out.required === undefined) delete out.required;
@@ -41,6 +53,15 @@ export function mergeTolerant(older: Json, newer: Json): Json {
   }
 
   return newer;
+}
+
+const hasNull = (t: unknown) => t === "null" || (Array.isArray(t) && t.includes("null"));
+
+/** Union of two schema `type`s (string or string[]), newer first, a single type kept as a string. */
+function mergeType(older: Json, newer: Json): Json {
+  const list = (t: Json): Json[] => (t === undefined ? [] : Array.isArray(t) ? t : [t]);
+  const all = [...new Set([...list(newer), ...list(older)])];
+  return all.length === 1 ? all[0] : all;
 }
 
 function mergeRequired(older: Record<string, Json>, newer: Record<string, Json>): Json {

@@ -128,7 +128,7 @@ I did not find an existing tool for this. Hey API's multi-input merges different
 A wrapper around the Node API of `openapi-typescript`, no fork, published as `<package>`:
 1. **Inputs:** one spec per released version of one major, plus a _floor_ (oldest supported minor).
 2. **Gate:** `oasdiff breaking` on each consecutive pair; the build fails on any break. Inside a major, changes must be additive.
-3. **Tolerant merge:** paths, operations and properties are the union; `required` is the intersection; enums are the union; the rest is newest-wins.
+3. **Tolerant merge:** paths, operations and properties are the union; `required` is the intersection; enums are the union; a field nullable in any version stays nullable; the rest is newest-wins.
 4. **Since maps:** for operations and schema fields introduced after the floor, the first version that has them.
 5. **Generation:** `openapiTS(mergedDocument, { transform })`. The `transform` hook turns `x-extensible-enum` into open unions (`"a" | "b" | (string & {})`).
 6. **Runtime (separate, thin):** reads `GET <base>/version` and `X-Api-Version`, and exposes `supports(op)` / `hasField(field)`. A second `openapi-react-query` client is typed with gated operations removed, so calling a newer operation without a capability check is a compile error.
