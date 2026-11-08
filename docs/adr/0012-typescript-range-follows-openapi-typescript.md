@@ -1,6 +1,6 @@
 # 0012. The `typescript` range follows `openapi-typescript`'s peer range
 
-- Status: accepted
+- Status: superseded by 0017
 - Date: 2026-11-08
 
 ## Context
