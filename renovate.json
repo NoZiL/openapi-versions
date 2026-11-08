@@ -2,7 +2,10 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
   "minimumReleaseAge": "3 days",
-  "lockFileMaintenance": { "enabled": true, "schedule": ["before 6am on monday"] },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on monday"]
+  },
   "packageRules": [
     {
       "description": "openapi-ts packages move together and are the runtime contract (peer ranges, the patched helpers); review them as one PR",
@@ -10,12 +13,42 @@
       "groupName": "openapi-ts",
       "automerge": false
     },
-    { "matchDepTypes": ["peerDependencies"], "rangeStrategy": "widen" },
-    { "matchUpdateTypes": ["minor", "patch"], "matchDepTypes": ["devDependencies"], "groupName": "dev dependencies", "automerge": true },
+    {
+      "matchDepTypes": ["peerDependencies"],
+      "rangeStrategy": "widen"
+    },
+    {
+      "matchUpdateTypes": ["minor", "patch"],
+      "matchDepTypes": ["devDependencies"],
+      "groupName": "dev dependencies",
+      "automerge": true
+    },
     {
       "description": "oasdiff is the breaking-change gate; MIN_OASDIFF_VERSION in codegen/breaking.ts must stay compatible",
       "matchPackageNames": ["oasdiff/oasdiff"],
       "automerge": false
+    },
+    {
+      "description": "GitHub Actions bumps touch the same workflow files; one PR avoids serial rebases",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch", "digest", "pin"],
+      "groupName": "github actions",
+      "automerge": true
+    },
+    {
+      "description": "runtime dependency bumps ship to users; group them but keep a human review",
+      "matchManagers": ["npm"],
+      "matchDepTypes": ["dependencies"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "groupName": "runtime dependencies",
+      "automerge": false
+    },
+    {
+      "description": "majors never automerge and are easy to spot",
+      "matchUpdateTypes": ["major"],
+      "labels": ["major"],
+      "automerge": false
     }
-  ]
+  ],
+  "rebaseWhen": "behind-base-branch"
 }
