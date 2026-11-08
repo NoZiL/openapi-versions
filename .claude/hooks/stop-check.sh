@@ -1,6 +1,7 @@
 #!/bin/sh
 # Stop: block once if a policy file changed without an ADR, or if the tree is
-# red (lint, typecheck, test). oasdiff and build stay CI-only (ADR 0004).
+# red (lint, typecheck, test), skipping the checks if the state is unchanged
+# since the last green run. oasdiff and build stay CI-only (ADR 0004).
 # stop_hook_active is true on the retry after a block, so we never loop.
 input=$(cat)
 [ "$(printf '%s' "$input" | jq -r '.stop_hook_active // false')" = "true" ] && exit 0
@@ -19,8 +20,8 @@ policy=$(printf '%s\n' "$changed" | grep -E '^(\.github/workflows/|mise\.toml$|r
 deps_of() { jq -S '[.dependencies,.devDependencies,.peerDependencies,.optionalDependencies,.pnpm]'; }
 if printf '%s\n' "$changed" | grep -qx 'package.json' \
   && [ "$(git show "$mb:package.json" 2>/dev/null | deps_of)" != "$(deps_of < package.json)" ]; then
-  policy="$policy
-package.json (dependencies)"
+  policy="${policy:+$policy
+}package.json (dependencies)"
 fi
 if [ -n "$policy" ] && ! printf '%s\n' "$changed" | grep -q '^docs/adr/'; then
   reasons="Policy files changed with no ADR under docs/adr/:
@@ -28,11 +29,19 @@ $policy
 Read docs/adr/README.md; add an ADR or say why not."
 fi
 
-if ! out=$(mise run check:fast 2>&1); then
-  reasons="${reasons:+$reasons
+# Skip the slow checks when nothing changed since the last green run.
+# State = HEAD + tracked diff + untracked paths and contents.
+cache="$(git rev-parse --git-dir)/claude-stop-check"
+state=$( { git rev-parse HEAD; git diff HEAD; git ls-files -o --exclude-standard -z | xargs -0 git hash-object --stdin-paths 2>/dev/null; git ls-files -o --exclude-standard; } | shasum | cut -d' ' -f1)
+if [ "$(cat "$cache" 2>/dev/null)" != "$state" ]; then
+  if out=$(mise run check:fast 2>&1); then
+    printf '%s' "$state" > "$cache"
+  else
+    reasons="${reasons:+$reasons
 
 }mise run check:fast failed. Fix it before finishing:
 $(printf '%s\n' "$out" | tail -40)"
+  fi
 fi
 
 [ -n "$reasons" ] || exit 0

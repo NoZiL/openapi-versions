@@ -11,6 +11,8 @@ Agents finish sessions with a red tree or change policy files (workflows, `mise.
 
 `.claude/hooks/stop-check.sh` runs on `Stop`. It diffs the working tree against the merge-base with `main`. If a policy file changed and nothing under `docs/adr/` did, it blocks with "read docs/adr/README.md; add an ADR or say why not". It also runs the new `mise run check:fast` (lint, typecheck, test) and blocks on failure. It does nothing when `stop_hook_active` is set, so it blocks at most once per stop and cannot loop. It does nothing when the branch has no changes.
 
+Stop fires after every assistant turn, so the slow checks are cached: after a green run the hook stores a hash of `HEAD`, `git diff HEAD` and the untracked paths and contents in `$(git rev-parse --git-dir)/claude-stop-check` (per worktree, untracked by git). If the hash is unchanged the checks are skipped; a red run never writes it. The ADR check is cheap and always runs.
+
 CI does not warn on the same paths. Renovate dependency bumps would trigger it constantly and the ADR requirement is a judgement ("or say why not"), which a hook can prompt for but a CI check cannot settle. Revisit if policy changes keep landing without ADRs from humans.
 
 ## Consequences
