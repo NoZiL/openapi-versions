@@ -21,18 +21,23 @@ run = "pnpm lint"
 [tasks."lint:workflows"]
 description = "Lint GitHub Actions workflows"
 run = "actionlint"
-# typecheck and test read both generated dirs, and `pnpm typecheck` / `pnpm test` each start
-# with `rm -rf` + codegen. mise runs deps in parallel, so one could delete the dir while the
-# other reads it (#62). Here codegen runs once as a shared dep and the tasks only read.
+# pnpm typecheck / pnpm test each start with `rm -rf <generated dir>` + codegen, and mise
+# runs check:fast's deps in parallel: typecheck's codegen:test could delete
+# test/fixtures/generated while vitest read it (#62). Here each codegen runs once, as a
+# shared dep, and typecheck / test call the scripts that only read. See ADR 0018.
+[tasks."codegen:playground"]
+run = "pnpm codegen:playground"
+[tasks."codegen:test"]
+run = "pnpm codegen:test"
 [tasks.codegen]
 description = "Regenerate playground/generated and test/fixtures/generated"
-run = "pnpm codegen"
+depends = ["codegen:playground", "codegen:test"]
 [tasks.typecheck]
-depends = ["codegen"]
-run = "pnpm exec tsc --noEmit"
+depends = ["codegen:playground", "codegen:test"]
+run = "pnpm typecheck:tsc"
 [tasks.test]
-depends = ["codegen"]
-run = "pnpm exec vitest run"
+depends = ["codegen:test"]
+run = "pnpm test:run"
 [tasks."check:breaking"]
 run = "pnpm check:breaking"
 [tasks.build]
