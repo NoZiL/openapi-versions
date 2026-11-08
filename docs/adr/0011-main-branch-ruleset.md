@@ -9,7 +9,7 @@ Anything that lands on `main` can run `release.yml` and publish to npm immediate
 
 ## Decision
 
-A repository ruleset named `main` targets the default branch with no bypass actors, so neither the owner nor the release bot can skip it:
+A repository ruleset named `main` targets the default branch. The only bypass actor is the repository admin role, in pull-request-only mode: the owner can merge a PR without waiting for `check` (for example when CI is down), but cannot push to `main` directly. The release bot has no bypass.
 
 - changes go through a pull request, with 0 required approvals (a single maintainer cannot approve their own PR; raise it when a second maintainer joins)
 - the `check` status check from `ci.yml` must pass
@@ -20,4 +20,4 @@ The release bot only pushes the Version Packages branch and tags, never `main`, 
 
 ## Consequences
 
-Direct pushes to `main` fail, including from agents. A direct push was verified to be rejected on 2026-11-08. The first Version Packages PR after this change is the check that the release flow still merges; fix the ruleset, not the workflow, if it does not. If `check` is renamed, update the ruleset in the same change. Tag rules, a required-signature rule and a second reviewer are left for when the package has real consumers or a second maintainer.
+Direct pushes to `main` fail, including from the owner and agents. A direct push was verified to be rejected on 2026-11-08. The first Version Packages PR after this change is the check that the release flow still merges; fix the ruleset, not the workflow, if it does not. If `check` is renamed, update the ruleset in the same change. Tag rules, a required-signature rule and a second reviewer are left for when the package has real consumers or a second maintainer.
