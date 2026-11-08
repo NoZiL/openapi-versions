@@ -27,8 +27,9 @@ rel="./$prefix$(basename "$file")"
 # The common dir, absolute and resolved, from the top level (older git prints
 # --git-common-dir relative to it; --path-format=absolute needs git 2.31).
 common() {
-  (t=$(git -C "$1" rev-parse --show-toplevel 2>/dev/null) && [ -n "$t" ] && cd "$t" \
-    && d=$(git rev-parse --git-common-dir 2>/dev/null) && [ -n "$d" ] && cd "$d" && pwd -P)
+  # No CDPATH: a relative .git must resolve against the top level only.
+  (unset CDPATH; t=$(git -C "$1" rev-parse --show-toplevel 2>/dev/null) && [ -n "$t" ] && cd -P -- "$t" \
+    && d=$(git rev-parse --git-common-dir 2>/dev/null) && [ -n "$d" ] && cd -P -- "$d" && pwd -P)
 }
 # A project dir outside any repository would skip every file. Say so on stderr
 # (exit 0: Claude Code shows it in the transcript view only).

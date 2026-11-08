@@ -71,13 +71,22 @@ key() { # <inputs hash>: empty if the inputs hash is empty
 cache="$(git rev-parse --absolute-git-dir)/claude-stop-check"
 before=$(inputs)
 k=$(key "$before")
+# Neither tool may edit the tree (ADRs 0014, 0022). mise installs missing tools
+# (before a task, from a shim, on command-not-found) and writes a version mise.lock
+# lacks into it: MISE_AUTO_INSTALL=false turns all of that off. pnpm re-syncs
+# pnpm-lock.yaml and node_modules before a script when they are out of date:
+# verify-deps=error fails instead.
+export MISE_AUTO_INSTALL=false
 if [ -z "$k" ] || [ "$(cat "$cache" 2>/dev/null)" != "$k" ]; then
-  # Neither tool may edit the tree (ADRs 0014, 0022). pnpm re-syncs pnpm-lock.yaml
-  # and node_modules before a script when they are out of date: fail instead.
-  # mise installs a missing tool before a task and writes a version mise.lock lacks
-  # into it: turn the auto-install off (MISE_LOCKED instead warns about every
-  # global tool mise.lock does not pin).
-  if out=$(MISE_TASK_RUN_AUTO_INSTALL=false pnpm_config_verify_deps_before_run=error mise run check:fast 2>&1); then
+  # Tools from this project's mise.toml that are not installed: the checks would
+  # run on whatever else is on PATH, and a green run would be cached. Block before
+  # running them. Global tools are left out: the checks do not use them.
+  missing=$(mise ls --no-global --missing 2>/dev/null | awk '{printf "%s%s@%s", (NR > 1 ? ", " : ""), $1, $2}')
+  if [ -n "$missing" ]; then
+    reasons="${reasons:+$reasons
+
+}Tools from mise.toml not installed: $missing. Run mise install (it updates mise.lock for a new version); the checks did not run."
+  elif out=$(pnpm_config_verify_deps_before_run=error mise run check:fast 2>&1); then
     # Record green only if no input changed during the run (another tool, a
     # second session in this worktree). The key takes the generated dirs as the
     # checks left them, so regenerated output does not cost another run.
@@ -91,12 +100,6 @@ if [ -z "$k" ] || [ "$(cat "$cache" 2>/dev/null)" != "$k" ]; then
     hint=""
     printf '%s' "$out" | grep -q ERR_PNPM_VERIFY_DEPS_BEFORE_RUN \
       && hint="Dependencies not installed or out of date (no node_modules, or package.json, pnpm-lock.yaml or pnpm-workspace.yaml changed since the last install): run pnpm install.
-"
-    # Tools from this project's mise.toml that are not installed (the run did not
-    # install them). Global tools are left out: the checks do not use them.
-    missing=$(mise ls --local --missing 2>/dev/null | awk '{printf "%s%s@%s", (NR > 1 ? ", " : ""), $1, $2}')
-    [ -z "$missing" ] \
-      || hint="${hint}Tools from mise.toml not installed, so the checks ran without them: $missing. Run mise install (it updates mise.lock for a new version).
 "
     reasons="${reasons:+$reasons
 
