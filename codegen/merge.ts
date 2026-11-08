@@ -69,4 +69,4 @@ function mergeParams(older: Json[], newer: Json[]): Json[] {
   return out;
 }
 
-export const mergeAll = (docs: Json[]) => docs.reduce((acc, d) => mergeTolerant(acc, d));
+export const mergeAll = (docs: Json[]): Json => docs.reduce((acc, d) => mergeTolerant(acc, d));
