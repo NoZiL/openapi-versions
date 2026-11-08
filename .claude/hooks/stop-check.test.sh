@@ -6,6 +6,34 @@ set -eu
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY CLAUDE_PROJECT_DIR
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 hook="$(cd "$(dirname "$0")" && pwd)/stop-check.sh"
+root="$(cd "$(dirname "$0")/../.." && pwd)"
+fails=0
+
+# The cache assumes check:fast regenerates both generated dirs before typecheck and
+# test read them, and that typecheck and test run no codegen of their own (ADRs
+# 0015, 0020): that holds only through these mise depends and run lines. Checked
+# against the real mise.toml, before the stub replaces mise.
+err=$(mktemp)
+tasks=$(mise -C "$root" tasks ls --json 2> "$err" \
+  | jq -r '.[] | "\(.name) depends=\(.depends // [] | sort | join(",")) run=\(.run // [] | join(";"))"' 2>> "$err") || tasks=""
+msg=$(cat "$err")
+rm -f "$err"
+# want_task <task> <expected "depends=... run=..." line>
+want_task() {
+  got=$(printf '%s\n' "$tasks" | grep "^$1 " || true)
+  if [ "$got" = "$1 $2" ]; then echo "ok   mise $1: $2"
+  else echo "FAIL mise $1: got '${got#"$1 "}', expected '$2'"; fails=$((fails + 1)); fi
+}
+if [ -z "$tasks" ]; then
+  echo "FAIL mise tasks ls gave nothing (is mise installed and $root/mise.toml trusted?): $msg"
+  fails=$((fails + 1))
+else
+  want_task check:fast "depends=lint,test,typecheck run="
+  want_task typecheck "depends=codegen run=pnpm typecheck:tsc"
+  want_task codegen "depends=codegen:playground,codegen:test run="
+  want_task test "depends=codegen:test run=pnpm test:run"
+fi
+
 tmp=$(mktemp -d)
 trap 'chmod -R u+rwx "$tmp" 2>/dev/null; rm -rf "$tmp"' EXIT
 repo="$tmp/repo" count="$tmp/count"
@@ -29,16 +57,19 @@ echo lock > node_modules/.pnpm/lock.yaml
 mkdir "$tmp/bin"
 cat > "$tmp/bin/mise" <<'EOF'
 #!/bin/sh
+# `mise ls --no-global --missing` prints $MISSING (missing project tools).
+[ "$*" = "ls --no-global --missing" ] && { [ -z "${MISSING:-}" ] || printf '%s\n' "$MISSING"; exit 0; }
 [ "$*" = "run check:fast" ] || { echo "unexpected: mise $*" >&2; exit 2; }
 echo run >> "$COUNT"
+echo "auto-install=${MISE_AUTO_INSTALL:-} verify=${pnpm_config_verify_deps_before_run:-}" > "$COUNT.env"
 [ -z "${DURING:-}" ] || sh -c "$DURING"
+[ -z "${OUT:-}" ] || printf '%s\n' "$OUT"
 exit "${CHECK_RC:-0}"
 EOF
 chmod +x "$tmp/bin/mise"
 export PATH="$tmp/bin:$PATH" COUNT="$count"
 : > "$count"
 
-fails=0
 runs() { wc -l < "$count" | tr -d ' '; }
 # expect <ran|skipped> <name>: run the hook once and check whether the checks ran.
 expect() {
@@ -98,6 +129,29 @@ expect ran "red run"
 unset CHECK_RC
 expect ran "red run is not cached"
 
+# Neither pnpm nor mise may edit the tree during the checks (ADRs 0014, 0022).
+[ "$(cat "$count.env")" = "auto-install=false verify=error" ] && echo "ok   checks run with mise auto-install off and verify-deps=error" \
+  || { echo "FAIL checks env: $(cat "$count.env")"; fails=$((fails + 1)); }
+
+# A red run's reason gets a hint for the two install errors, and none otherwise.
+# hint <name> <mise output> <missing tools> <expected text in the reason, or "none">
+hint() {
+  echo edit >> work.txt
+  export CHECK_RC=1 OUT="$2" MISSING="$3"
+  echo '{}' | sh "$hook" > "$tmp/out"
+  unset CHECK_RC OUT MISSING
+  r=$(jq -r .reason "$tmp/out")
+  case "$4" in
+    none) printf '%s' "$r" | grep -q '^mise run check:fast failed' && ! printf '%s' "$r" | grep -qE 'run (pnpm|mise) install' ;;
+    *) printf '%s' "$r" | grep -qF "$4" ;;
+  esac && echo "ok   hint: $1" || { echo "FAIL hint: $1: $r"; fails=$((fails + 1)); }
+}
+hint "pnpm deps out of date" " ERR_PNPM_VERIFY_DEPS_BEFORE_RUN  Cannot run" "" "no node_modules, or package.json, pnpm-lock.yaml or pnpm-workspace.yaml changed since the last install): run pnpm install."
+hint "other failure" "error TS2322" "" none
+# A lockfile warning about a global tool is not a project tool missing.
+hint "global tool warning only" "mise WARN  lefthook@2.1.10 is not in the lockfile
+error TS2322" "" none
+
 # The hook works in the hook input's cwd, not the process cwd.
 echo edit >> work.txt
 n=$(runs)
@@ -136,6 +190,50 @@ if [ "$(id -u)" -ne 0 ]; then
 else
   echo "skip find fails partway (root ignores permissions)"
 fi
+
+# Invalid hook input: exit 0 quietly, no jq parse errors on stderr, no checks.
+echo edit >> work.txt
+n=$(runs)
+rc=0
+echo 'not json' | sh "$hook" > "$tmp/out" 2> "$tmp/err" || rc=$?
+if [ "$rc" = 0 ] && [ "$(runs)" = "$n" ] && [ ! -s "$tmp/out" ] && [ ! -s "$tmp/err" ]; then echo "ok   invalid input: exits quietly"
+else echo "FAIL invalid input: rc=$rc, stdout=$(cat "$tmp/out"), stderr=$(cat "$tmp/err")"; fails=$((fails + 1)); fi
+
+# A project tool not installed: block before the checks run, and never cache, even
+# though the checks would pass on whatever else is on PATH.
+echo edit >> work.txt
+n=$(runs)
+export MISSING="node  27.0.0 (missing)  /repo/mise.toml  27
+actionlint  1.7.10 (missing)  /repo/mise.toml  1.7.10"
+echo '{}' | sh "$hook" > "$tmp/out"
+unset MISSING
+r=$(jq -r .reason "$tmp/out" 2>/dev/null)
+if [ "$(runs)" = "$n" ] && printf '%s' "$r" | grep -qF 'not installed: node@27.0.0, actionlint@1.7.10. Run mise install'; then
+  echo "ok   missing project tool: blocks before the checks"
+else echo "FAIL missing project tool: runs $n -> $(runs), reason: $r"; fails=$((fails + 1)); fi
+expect ran "missing project tool: nothing cached, checks run once installed"
+
+# No jq on PATH (everything else kept): a non-blocking error that says why, no
+# checks, and the hook still reads all of stdin first. The writer waits so the hook
+# would have exited already if it did not read, and ignores SIGPIPE to see EPIPE.
+mkdir "$tmp/nojq"
+IFS=:
+for d in $PATH; do
+  [ -d "$d" ] || continue
+  for f in "$d"/*; do
+    b=${f##*/}
+    [ "$b" = jq ] || [ -e "$tmp/nojq/$b" ] || [ ! -x "$f" ] || ln -s "$f" "$tmp/nojq/$b"
+  done
+done
+unset IFS
+n=$(runs)
+rc=0
+rm -f "$tmp/epipe"
+(trap '' PIPE; sleep 1; printf '{}' || echo epipe > "$tmp/epipe") \
+  | PATH="$tmp/nojq" /bin/sh "$hook" > "$tmp/out" 2> "$tmp/err" || rc=$?
+if [ "$rc" = 1 ] && [ "$(runs)" = "$n" ] && grep -q 'jq not found' "$tmp/err" && [ ! -e "$tmp/epipe" ]; then
+  echo "ok   no jq: reads stdin, says so, exit 1"
+else echo "FAIL no jq: rc=$rc, epipe=$([ -e "$tmp/epipe" ] && echo yes || echo no), stderr=$(cat "$tmp/err")"; fails=$((fails + 1)); fi
 
 n=$(runs)
 echo '{"stop_hook_active":true}' | sh "$hook" > /dev/null
