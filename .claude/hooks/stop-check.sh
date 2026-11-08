@@ -4,7 +4,7 @@
 # since the last green run (ADRs 0013, 0015). oasdiff and build stay CI-only (ADR 0004).
 # stop_hook_active is true on the retry after a block, so we never loop.
 input=$(cat)
-[ "$(printf '%s' "$input" | jq -r '.stop_hook_active // false')" = "true" ] && exit 0
+[ "$(printf '%s' "$input" | jq -r '.stop_hook_active // false' 2>/dev/null)" = "true" ] && exit 0
 
 # Work in the session's checkout (hook input cwd, which Claude Code always sends;
 # the process cwd only when it is absent), from its top level.
@@ -65,9 +65,11 @@ cache="$(git rev-parse --absolute-git-dir)/claude-stop-check"
 before=$(inputs)
 k=$(key "$before")
 if [ -z "$k" ] || [ "$(cat "$cache" 2>/dev/null)" != "$k" ]; then
-  # pnpm re-syncs pnpm-lock.yaml and node_modules before a script when
-  # package.json dependencies differ; fail instead so the hook never edits the tree.
-  if out=$(pnpm_config_verify_deps_before_run=error mise run check:fast 2>&1); then
+  # Neither tool may edit the tree (ADRs 0014, 0022). pnpm re-syncs pnpm-lock.yaml
+  # and node_modules before a script when they are out of date: fail instead.
+  # mise installs a missing tool before a task and records a version the lockfile
+  # lacks in mise.lock: MISE_LOCKED installs only what mise.lock already pins.
+  if out=$(MISE_LOCKED=true pnpm_config_verify_deps_before_run=error mise run check:fast 2>&1); then
     # Record green only if no input changed during the run (another tool, a
     # second session in this worktree). The key takes the generated dirs as the
     # checks left them, so regenerated output does not cost another run.
@@ -80,7 +82,10 @@ if [ -z "$k" ] || [ "$(cat "$cache" 2>/dev/null)" != "$k" ]; then
   else
     hint=""
     printf '%s' "$out" | grep -q ERR_PNPM_VERIFY_DEPS_BEFORE_RUN \
-      && hint="Lockfile or node_modules out of date with package.json: run pnpm install.
+      && hint="Dependencies not installed or out of date (no node_modules, or package.json, pnpm-lock.yaml or pnpm-workspace.yaml changed since the last install): run pnpm install.
+"
+    printf '%s' "$out" | grep -q 'is not in the lockfile' \
+      && hint="${hint}A tool version in mise.toml is not in mise.lock, so mise did not install it: run mise install (it updates mise.lock).
 "
     reasons="${reasons:+$reasons
 

@@ -6,6 +6,23 @@ set -eu
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY CLAUDE_PROJECT_DIR
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 hook="$(cd "$(dirname "$0")" && pwd)/stop-check.sh"
+root="$(cd "$(dirname "$0")/../.." && pwd)"
+fails=0
+
+# The cache assumes check:fast regenerates both generated dirs before typecheck and
+# test read them (ADRs 0015, 0020): that holds only through these mise depends.
+# Checked against the real mise.toml, before the stub replaces mise.
+# want_deps <task> <expected depends, sorted, space-separated>
+want_deps() {
+  got=$(mise -C "$root" tasks info "$1" --json | jq -r '.depends[]' | sort | tr '\n' ' ')
+  if [ "$got" = "$2 " ]; then echo "ok   mise $1 depends on: $2"
+  else echo "FAIL mise $1 depends on '$got', expected '$2'"; fails=$((fails + 1)); fi
+}
+want_deps check:fast "lint test typecheck"
+want_deps typecheck "codegen"
+want_deps codegen "codegen:playground codegen:test"
+want_deps test "codegen:test"
+
 tmp=$(mktemp -d)
 trap 'chmod -R u+rwx "$tmp" 2>/dev/null; rm -rf "$tmp"' EXIT
 repo="$tmp/repo" count="$tmp/count"
@@ -31,14 +48,15 @@ cat > "$tmp/bin/mise" <<'EOF'
 #!/bin/sh
 [ "$*" = "run check:fast" ] || { echo "unexpected: mise $*" >&2; exit 2; }
 echo run >> "$COUNT"
+echo "MISE_LOCKED=${MISE_LOCKED:-} verify=${pnpm_config_verify_deps_before_run:-}" > "$COUNT.env"
 [ -z "${DURING:-}" ] || sh -c "$DURING"
+[ -z "${OUT:-}" ] || printf '%s\n' "$OUT"
 exit "${CHECK_RC:-0}"
 EOF
 chmod +x "$tmp/bin/mise"
 export PATH="$tmp/bin:$PATH" COUNT="$count"
 : > "$count"
 
-fails=0
 runs() { wc -l < "$count" | tr -d ' '; }
 # expect <ran|skipped> <name>: run the hook once and check whether the checks ran.
 expect() {
@@ -98,6 +116,27 @@ expect ran "red run"
 unset CHECK_RC
 expect ran "red run is not cached"
 
+# Neither pnpm nor mise may edit the tree during the checks (ADRs 0014, 0022).
+[ "$(cat "$count.env")" = "MISE_LOCKED=true verify=error" ] && echo "ok   checks run with MISE_LOCKED and verify-deps=error" \
+  || { echo "FAIL checks env: $(cat "$count.env")"; fails=$((fails + 1)); }
+
+# A red run's reason gets a hint for the two install errors, and none otherwise.
+# hint <name> <mise output> <expected text in the reason, or "none">
+hint() {
+  echo edit >> work.txt
+  export CHECK_RC=1 OUT="$2"
+  echo '{}' | sh "$hook" > "$tmp/out"
+  unset CHECK_RC OUT
+  r=$(jq -r .reason "$tmp/out")
+  case "$3" in
+    none) printf '%s' "$r" | grep -q '^mise run check:fast failed' && ! printf '%s' "$r" | grep -q 'run \(pnpm\|mise\) install' ;;
+    *) printf '%s' "$r" | grep -qF "$3" ;;
+  esac && echo "ok   hint: $1" || { echo "FAIL hint: $1: $r"; fails=$((fails + 1)); }
+}
+hint "pnpm deps out of date" " ERR_PNPM_VERIFY_DEPS_BEFORE_RUN  Cannot run" "no node_modules, or package.json, pnpm-lock.yaml or pnpm-workspace.yaml changed since the last install): run pnpm install."
+hint "tool not in mise.lock" "actionlint@1.7.11 is not in the lockfile" "not in mise.lock, so mise did not install it: run mise install"
+hint "other failure" "error TS2322" none
+
 # The hook works in the hook input's cwd, not the process cwd.
 echo edit >> work.txt
 n=$(runs)
@@ -136,6 +175,14 @@ if [ "$(id -u)" -ne 0 ]; then
 else
   echo "skip find fails partway (root ignores permissions)"
 fi
+
+# Invalid hook input: exit 0 quietly, no jq parse errors on stderr, no checks.
+echo edit >> work.txt
+n=$(runs)
+rc=0
+echo 'not json' | sh "$hook" > "$tmp/out" 2> "$tmp/err" || rc=$?
+if [ "$rc" = 0 ] && [ "$(runs)" = "$n" ] && [ ! -s "$tmp/out" ] && [ ! -s "$tmp/err" ]; then echo "ok   invalid input: exits quietly"
+else echo "FAIL invalid input: rc=$rc, stdout=$(cat "$tmp/out"), stderr=$(cat "$tmp/err")"; fails=$((fails + 1)); fi
 
 n=$(runs)
 echo '{"stop_hook_active":true}' | sh "$hook" > /dev/null

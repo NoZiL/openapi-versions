@@ -25,15 +25,22 @@ root=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null) && [ -n "$root" ] ||
 prefix=$(git -C "$dir" rev-parse --show-prefix 2>/dev/null) || exit 0
 rel="./$prefix$(basename "$file")"
 common() { git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null; }
-c=$(common "$dir") && [ -n "$c" ] && [ "$c" = "$(common "$project")" ] || exit 0
+# --path-format needs git 2.31. If the project itself has no common dir (older git,
+# or CLAUDE_PROJECT_DIR not in a repository), every file would be skipped: say so.
+pc=$(common "$project") && [ -n "$pc" ] || {
+  echo "biome-fix: skipped $file: no git common dir for $project (not a repository, or git < 2.31)" >&2
+  exit 0
+}
+c=$(common "$dir") && [ -n "$c" ] && [ "$c" = "$pc" ] || exit 0
 cd "$root" || exit 0
 # A worktree without `pnpm install` has no Biome: skip rather than report a lint failure.
 [ -x node_modules/.bin/biome ] || exit 0
 flags="--no-errors-on-unmatched --files-ignore-unknown=true --colors=off"
 # Fixes cascade (organizeImports then formatting) and Biome needs two passes to converge;
 # then a plain check reports what is left.
-pnpm exec biome check --write $flags "$rel" >/dev/null 2>&1
-pnpm exec biome check --write $flags "$rel" >/dev/null 2>&1
-out=$(pnpm exec biome check $flags "$rel" 2>&1) && exit 0
+# The binary directly: pnpm exec would start pnpm three times per edit.
+node_modules/.bin/biome check --write $flags "$rel" >/dev/null 2>&1
+node_modules/.bin/biome check --write $flags "$rel" >/dev/null 2>&1
+out=$(node_modules/.bin/biome check $flags "$rel" 2>&1) && exit 0
 printf 'Biome found problems in %s that need a manual fix:\n%s\n' "$file" "$out" >&2
 exit 2
