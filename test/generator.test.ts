@@ -31,6 +31,9 @@ describe("generator parity", () => {
     ["playground/specs", "1.3.0"],
     // extensible enums inside arrays, allOf and nullable anyOf, nullable, and values that need escaping
     ["test/fixtures/enum-shapes", "1.0.0"],
+    // OpenAPI 3.0 `nullable: true` open enums as properties, components, array items, allOf/anyOf members,
+    // additionalProperties and a query parameter, next to closed nullable enums
+    ["test/fixtures/enum-shapes-3.0", "1.0.0"],
   ])("openapi-typescript and openapi-typesafe write the same schema.d.ts for %s", async (specsDir, floor) => {
     const [a, b] = await Promise.all([generate("openapi-typescript", specsDir, floor), generate("openapi-typesafe", specsDir, floor)]);
     expect(a).toMatch(/\| \(string & \{\}\)/);
@@ -42,6 +45,23 @@ describe("generator parity", () => {
     expect(out).toContain(`list?: ("a" | "b" | (string & {}))[];`);
     expect(out).toContain(`composed?: ("a" | "b" | (string & {})) & unknown;`);
   });
+
+  it.each(["openapi-typescript", "openapi-typesafe"] as const)(
+    "keeps OpenAPI 3.0 `nullable: true` on an open enum with %s",
+    async (generator) => {
+      const out = await generate(generator, "test/fixtures/enum-shapes-3.0", "1.0.0");
+      expect(out).toContain(`nullable?: "a" | (string & {}) | null;`);
+      expect(out).toContain(`notNullable?: "a" | (string & {});`);
+      expect(out).toContain(`NullableOpen: "a" | (string & {}) | null;`);
+      expect(out).toContain(`ref?: components["schemas"]["NullableOpen"];`);
+      expect(out).toContain(`closedNullable?: "a" | null;`);
+      // elsewhere the generator may add its own `| null` around the transform's result: redundant, same type
+      const line = (name: string) => out.split("\n").find((l) => l.trimStart().startsWith(name)) ?? "";
+      for (const name of ["nullableItems?:", "q?:", "[key: string]:"]) {
+        expect(line(name)).toMatch(/"a" \| \(string & \{\}\) \| null\b/);
+      }
+    },
+  );
 
   it("leaves other schemas to the generator", async () => {
     const ir = openEnumsIr(await import("openapi-typesafe"));

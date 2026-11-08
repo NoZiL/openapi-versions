@@ -22,11 +22,15 @@ const require = createRequire(import.meta.url);
 
 /** The known values of an extensible string enum, or undefined if the schema is not one. */
 function extensibleEnum(schema: unknown): { values: string[]; nullable: boolean } | undefined {
-  const s = schema as { type?: unknown; "x-extensible-enum"?: unknown };
+  const s = schema as { type?: unknown; nullable?: unknown; "x-extensible-enum"?: unknown };
   const isString = s.type === "string" || (Array.isArray(s.type) && s.type.includes("string"));
   const values = s["x-extensible-enum"];
   if (!isString || !Array.isArray(values) || !values.every((v: unknown) => typeof v === "string")) return undefined;
-  return { values, nullable: Array.isArray(s.type) && s.type.includes("null") };
+  // OpenAPI 3.1 `type: ["string", "null"]`, or OpenAPI 3.0 `nullable: true`. For 3.0, both generators add their own
+  // `| null` around the result everywhere except where it replaces an object property or a top-level component
+  // (array items, allOf/anyOf members, additionalProperties, parameters, request bodies), and the hook cannot tell
+  // those calls apart; so those positions get a redundant `(... | null) | null`, the same type.
+  return { values, nullable: (Array.isArray(s.type) && s.type.includes("null")) || s.nullable === true };
 }
 
 let ts: typeof TS | undefined;

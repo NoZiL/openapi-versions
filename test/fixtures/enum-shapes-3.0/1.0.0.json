@@ -1,0 +1,126 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "enum shapes (OpenAPI 3.0)",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/things": {
+      "get": {
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true,
+              "x-extensible-enum": ["a"]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Thing"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Thing": {
+        "type": "object",
+        "required": ["plain"],
+        "properties": {
+          "plain": {
+            "type": "string",
+            "x-extensible-enum": ["a", "b"]
+          },
+          "nullable": {
+            "type": "string",
+            "nullable": true,
+            "x-extensible-enum": ["a"]
+          },
+          "notNullable": {
+            "type": "string",
+            "nullable": false,
+            "x-extensible-enum": ["a"]
+          },
+          "closedNullable": {
+            "type": "string",
+            "nullable": true,
+            "enum": ["a"]
+          },
+          "nullableItems": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "nullable": true,
+              "x-extensible-enum": ["a"]
+            }
+          },
+          "closedNullableItems": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "nullable": true,
+              "enum": ["a"]
+            }
+          },
+          "ref": {
+            "$ref": "#/components/schemas/NullableOpen"
+          },
+          "composed": {
+            "allOf": [
+              {
+                "type": "string",
+                "nullable": true,
+                "x-extensible-enum": ["a"]
+              },
+              {
+                "description": "x"
+              }
+            ]
+          },
+          "anyOfNullable": {
+            "anyOf": [
+              {
+                "type": "string",
+                "nullable": true,
+                "x-extensible-enum": ["y"]
+              },
+              {
+                "type": "integer"
+              }
+            ]
+          },
+          "map": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "nullable": true,
+              "x-extensible-enum": ["a"]
+            }
+          }
+        }
+      },
+      "NullableOpen": {
+        "type": "string",
+        "nullable": true,
+        "x-extensible-enum": ["a"]
+      },
+      "ClosedNullable": {
+        "type": "string",
+        "nullable": true,
+        "enum": ["a"]
+      }
+    }
+  }
+}
