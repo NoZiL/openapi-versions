@@ -47,6 +47,11 @@
       "default": "auto",
       "description": "Breaking-change gate (oasdiff) between consecutive specs. auto: run it when oasdiff is installed, warn and skip otherwise. required: fail when oasdiff is missing or too old (use in CI, or pass --require-gate). off: never run it."
     },
+    "generator": {
+      "type": "string",
+      "enum": ["openapi-typescript", "openapi-typesafe"],
+      "description": "Generator that writes schema.d.ts. Leave unset to use the one installed; if both are installed, openapi-typescript is used. openapi-typesafe supports TypeScript 5.4 to 7, needs no helpers patch and needs Node 22.12 or newer (ADR 0017)."
+    },
     "runtimeImport": {
       "type": "string",
       "minLength": 1,

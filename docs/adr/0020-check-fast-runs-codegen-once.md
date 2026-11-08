@@ -1,4 +1,4 @@
-# 0019. check:fast runs codegen once, as a shared mise dependency
+# 0020. check:fast runs codegen once, as a shared mise dependency
 
 - Status: accepted
 - Date: 2026-11-08

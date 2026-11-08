@@ -1,0 +1,83 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "enum shapes",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/things": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Thing"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Thing": {
+        "type": "object",
+        "required": ["plain"],
+        "properties": {
+          "plain": {
+            "type": "string",
+            "x-extensible-enum": ["a", "b"]
+          },
+          "nullable": {
+            "type": ["string", "null"],
+            "x-extensible-enum": ["a"]
+          },
+          "list": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "x-extensible-enum": ["a", "b"]
+            }
+          },
+          "nullableItems": {
+            "type": "array",
+            "items": {
+              "type": ["string", "null"],
+              "x-extensible-enum": ["a"]
+            }
+          },
+          "composed": {
+            "allOf": [
+              {
+                "type": "string",
+                "x-extensible-enum": ["a", "b"]
+              },
+              {
+                "description": "x"
+              }
+            ]
+          },
+          "anyOfNull": {
+            "anyOf": [
+              {
+                "type": "string",
+                "x-extensible-enum": ["y"]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "escaped": {
+            "type": "string",
+            "x-extensible-enum": ["quo\"te", "back\\slash", "café", "日本"]
+          }
+        }
+      }
+    }
+  }
+}

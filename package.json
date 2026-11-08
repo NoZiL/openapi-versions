@@ -44,6 +44,7 @@
     "openapi-fetch": "^0.17.0",
     "openapi-react-query": "^0.5.4",
     "openapi-typescript": "^7.13.0",
+    "openapi-typesafe": "1.0.0-rc.1",
     "openapi-typescript-helpers": "^0.1.0",
     "@tanstack/react-query": "^5.104.5",
     "react": "^19.3.1",
@@ -94,6 +95,7 @@
   ],
   "peerDependencies": {
     "openapi-typescript": "^7.13.0",
+    "openapi-typesafe": "^1.0.0-rc.1",
     "openapi-fetch": "^0.17.0",
     "openapi-react-query": "^0.5.4",
     "openapi-typescript-helpers": "^0.1.0",
@@ -101,6 +103,12 @@
     "react": "^19.3.1"
   },
   "peerDependenciesMeta": {
+    "openapi-typescript": {
+      "optional": true
+    },
+    "openapi-typesafe": {
+      "optional": true
+    },
     "react": {
       "optional": true
     },
