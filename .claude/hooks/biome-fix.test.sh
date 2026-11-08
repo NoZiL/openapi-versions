@@ -1,0 +1,57 @@
+#!/bin/sh
+# Tests for biome-fix.sh: Biome runs from the top level of the worktree holding the
+# edited file, with `pnpm` replaced by a stub on PATH. Run: sh .claude/hooks/biome-fix.test.sh
+set -eu
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
+hook="$(cd "$(dirname "$0")" && pwd)/biome-fix.sh"
+tmp=$(cd "$(mktemp -d)" && pwd -P) # resolved, so paths compare with `pwd -P`
+trap 'rm -rf "$tmp"' EXIT
+log="$tmp/log"
+
+newrepo() {
+  git init -q -b main "$1"
+  git -C "$1" -c user.email=t@example.com -c user.name=t commit -q --allow-empty -m init
+}
+newrepo "$tmp/main"
+git -C "$tmp/main" worktree add -q "$tmp/wt" -b wt
+newrepo "$tmp/other"
+mkdir -p "$tmp/main/src" "$tmp/wt/src" "$tmp/plain"
+for f in main/a.ts main/src/b.ts wt/src/c.ts other/d.ts plain/e.ts; do echo x > "$tmp/$f"; done
+
+# The stub logs "<cwd> <file>" for each Biome call and, like Biome, fails on a
+# file outside its cwd. $BIOME_RC makes the final plain check fail.
+mkdir "$tmp/bin"
+cat > "$tmp/bin/pnpm" <<'STUB'
+#!/bin/sh
+for f; do :; done
+echo "$(pwd -P) $f" >> "$LOG"
+case "$f" in "$(pwd -P)"/*) ;; *) echo "path is expected to be under the root" >&2; exit 1 ;; esac
+case "$*" in *--write*) ;; *) exit "${BIOME_RC:-0}" ;; esac
+STUB
+chmod +x "$tmp/bin/pnpm"
+export PATH="$tmp/bin:$PATH" LOG="$log" CLAUDE_PROJECT_DIR="$tmp/main"
+
+fails=0
+# expect <expected cwd, or "none"> <rc> <file> <name>
+expect() {
+  : > "$log"
+  rc=0
+  (cd "$tmp/main" && printf '{"tool_input":{"file_path":"%s"}}' "$3" | sh "$hook" 2> "$tmp/err") || rc=$?
+  if [ "$1" = none ]; then want=""; else want=$(printf '%s %s\n' "$1" "$3" "$1" "$3" "$1" "$3"); fi
+  if [ "$(cat "$log")" = "$want" ] && [ "$rc" = "$2" ]; then echo "ok   $4"
+  else echo "FAIL $4: rc=$rc, calls: $(cat "$log"), stderr: $(cat "$tmp/err")"; fails=$((fails + 1)); fi
+}
+
+expect "$tmp/main" 0 "$tmp/main/a.ts" "file in the session's checkout"
+expect "$tmp/main" 0 "$tmp/main/src/b.ts" "file in a subdirectory: runs from the top level"
+expect "$tmp/wt" 0 "$tmp/wt/src/c.ts" "file in another worktree: runs from that worktree"
+expect none 0 "$tmp/other/d.ts" "file in another repository: skipped"
+expect none 0 "$tmp/plain/e.ts" "file outside any repository: skipped"
+expect none 0 "$tmp/main/missing.ts" "deleted file: skipped"
+export BIOME_RC=1
+expect "$tmp/wt" 2 "$tmp/wt/src/c.ts" "problems left: exit 2"
+unset BIOME_RC
+grep -q 'need a manual fix' "$tmp/err" && echo "ok   problems left: reported" || { echo "FAIL problems left: not reported"; fails=$((fails + 1)); }
+
+[ "$fails" -eq 0 ] && echo "all passed" || { echo "$fails failed"; exit 1; }

@@ -7,7 +7,7 @@ unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY CLAUDE_PROJECT_D
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 hook="$(cd "$(dirname "$0")" && pwd)/stop-check.sh"
 tmp=$(mktemp -d)
-trap 'rm -rf "$tmp"' EXIT
+trap 'chmod -R u+rwx "$tmp" 2>/dev/null; rm -rf "$tmp"' EXIT
 repo="$tmp/repo" count="$tmp/count"
 mkdir "$repo"
 cd "$repo"
@@ -97,6 +97,43 @@ export CHECK_RC=1
 expect ran "red run"
 unset CHECK_RC
 expect ran "red run is not cached"
+
+# The hook works in the hook input's cwd, not the process cwd.
+echo edit >> work.txt
+n=$(runs)
+(cd "$tmp" && printf '{"cwd":"%s"}' "$repo" | sh "$hook" > /dev/null)
+[ "$(runs)" -gt "$n" ] && echo "ok   input cwd: checks run in that repo" || { echo "FAIL input cwd: checks did not run"; fails=$((fails + 1)); }
+(cd "$tmp" && printf '{"cwd":"%s"}' "$repo" | sh "$hook" > /dev/null)
+[ "$(runs)" -gt "$((n + 1))" ] && { echo "FAIL input cwd: missed the cache"; fails=$((fails + 1)); } || echo "ok   input cwd: hit"
+
+# A cwd outside any work tree (a plain directory, a .git dir): exit 0 quietly, no checks.
+echo edit >> work.txt
+mkdir "$tmp/outside"
+for dir in "$tmp/outside" "$repo/.git"; do
+  n=$(runs)
+  rc=0
+  (cd "$repo" && printf '{"cwd":"%s"}' "$dir" | sh "$hook" > "$tmp/out" 2> "$tmp/err") || rc=$?
+  if [ "$rc" = 0 ] && [ "$(runs)" = "$n" ] && [ ! -s "$tmp/out" ] && [ ! -s "$tmp/err" ]; then
+    echo "ok   cwd not in a work tree ($(basename "$dir")): exits quietly"
+  else
+    echo "FAIL cwd not in a work tree ($(basename "$dir")): rc=$rc, stdout=$(cat "$tmp/out"), stderr=$(cat "$tmp/err")"
+    fails=$((fails + 1))
+  fi
+done
+
+# find fails partway (here an unreadable dir): the hash fails, so never hit, never write.
+if [ "$(id -u)" -ne 0 ]; then
+  mkdir playground/generated/locked
+  echo gen > playground/generated/locked/c.ts
+  chmod 000 playground/generated/locked
+  expect ran "find fails partway: checks run"
+  expect ran "find fails partway: never hit, never written"
+  chmod 755 playground/generated/locked
+  expect ran "readable again: checks run"
+  expect skipped "readable again: hit"
+else
+  echo "skip find fails partway (root ignores permissions)"
+fi
 
 n=$(runs)
 echo '{"stop_hook_active":true}' | sh "$hook" > /dev/null
