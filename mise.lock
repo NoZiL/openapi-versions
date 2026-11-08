@@ -2,11 +2,6 @@
 
 lockfile_version = 3
 
-[[tools.actionlint]]
-version = "1.7.12"
-backend = "aqua:rhysd/actionlint"
-specifiers = ["1.7.12"]
-
 [[tools."github:oasdiff/oasdiff"]]
 version = "1.34.1"
 backend = "github:oasdiff/oasdiff"
