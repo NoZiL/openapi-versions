@@ -24,7 +24,7 @@ run = "actionlint"
 # pnpm typecheck / pnpm test each start with `rm -rf <generated dir>` + codegen, and mise
 # runs check:fast's deps in parallel: typecheck's codegen:test could delete
 # test/fixtures/generated while vitest read it (#62). Here each codegen runs once, as a
-# shared dep, and typecheck / test call the scripts that only read. See ADR 0018.
+# shared dep, and typecheck / test call the scripts that only read. See ADR 0019.
 [tasks."codegen:playground"]
 run = "pnpm codegen:playground"
 [tasks."codegen:test"]

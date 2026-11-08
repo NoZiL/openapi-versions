@@ -10,9 +10,16 @@ export interface VersionedDoc {
   doc: any;
 }
 
+/** `ops`: every operation key; `gatedOps` / `gatedFields`: key -> version that introduced it, only those newer than the floor */
+export interface SinceResult {
+  ops: string[];
+  gatedOps: Record<string, string>;
+  gatedFields: Record<string, string>;
+}
+
 const METHODS = ["get", "put", "post", "delete", "patch", "head", "options", "trace"] as const;
 
-export function computeSince(group: VersionedDoc[], floor: string) {
+export function computeSince(group: VersionedDoc[], floor: string): SinceResult {
   const sorted = [...group].sort((a, b) => semver.compare(a.version, b.version));
   const ops: Record<string, string> = {};
   const fields: Record<string, string> = {};
@@ -35,7 +42,7 @@ export function computeSince(group: VersionedDoc[], floor: string) {
     }
   }
 
-  const gated = (m: Record<string, string>) =>
+  const gated = (m: Record<string, string>): Record<string, string> =>
     Object.fromEntries(
       Object.entries(m)
         .filter(([, v]) => semver.gt(v, floor))
