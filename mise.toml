@@ -3,8 +3,7 @@ node = "26"
 pnpm = "12.18.0"
 "github:oasdiff/oasdiff" = "1.34.1"
 actionlint = "1.7.12"
-# Dev-only: the .claude hooks need it. macOS-only so the linux CI runner (jq is preinstalled there) does not download it.
-jq = { version = "1.8.2", os = ["macos"] }
+jq = "1.8.2"
 
 [tasks.install]
 run = "pnpm install"
