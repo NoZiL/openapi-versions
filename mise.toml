@@ -5,6 +5,10 @@ pnpm = "12.18.0"
 actionlint = "1.7.12"
 jq = "1.8.2"
 
+[tasks."check:fast"]
+description = "Lint, typecheck, test; what the Claude Code Stop hook runs"
+depends = ["lint", "typecheck", "test"]
+
 [tasks.install]
 run = "pnpm install"
 
