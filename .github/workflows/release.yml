@@ -6,7 +6,8 @@ on:
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
-# Writes go through the nozil-release-bot GitHub App token below, not GITHUB_TOKEN.
+# Writes go through the nozil-release-bot GitHub App token below, not the workflow's own token.
+# changesets/action exports it as GITHUB_TOKEN to the version and publish scripts.
 permissions:
   contents: read
   id-token: write # npm provenance
@@ -23,15 +24,16 @@ jobs:
           private-key: ${{ secrets.APP_PRIVATE_KEY }}
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          token: ${{ steps.app.outputs.token }} # pushes and tags are made by the bot, so CI runs on the release PR
+          persist-credentials: false # changesets/action pushes via the API with its github-token input; keep the bot token out of .git/config during pnpm install
       - uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5
       - run: pnpm install --frozen-lockfile
       - uses: changesets/action@ae32849d5ba541f9ae29e40e22a623bc13562f51 # v2.1.2
         with:
-          publish: pnpm release
-          version: pnpm changeset version
+          # v2 commits, tags and releases via the API with this token; using the bot's token means CI runs on the release PR
+          github-token: ${{ steps.app.outputs.token }}
+          publish-script: pnpm release
+          version-script: pnpm changeset version
         env:
-          GITHUB_TOKEN: ${{ steps.app.outputs.token }}
           NPM_CONFIG_PROVENANCE: "true" # auth is npm trusted publishing (OIDC), no token
 
   snapshot:
