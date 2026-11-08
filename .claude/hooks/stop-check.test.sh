@@ -111,8 +111,7 @@ echo edit >> work.txt
 mkdir "$tmp/outside"
 # An empty cwd must not fall back to the process cwd ($repo here).
 for dir in "$tmp/outside" "$repo/.git" "$tmp/missing" ""; do
-  label=${dir:-/empty}
-  label=$(basename "$label")
+  label=$(basename "${dir:-empty}")
   n=$(runs)
   rc=0
   (cd "$repo" && printf '{"cwd":"%s"}' "$dir" | sh "$hook" > "$tmp/out" 2> "$tmp/err") || rc=$?

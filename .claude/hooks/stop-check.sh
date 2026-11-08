@@ -6,8 +6,10 @@
 input=$(cat)
 [ "$(printf '%s' "$input" | jq -r '.stop_hook_active // false')" = "true" ] && exit 0
 
-# Work in the session's checkout (hook input cwd), from its top level.
-# Outside a work tree, rev-parse prints nothing and `cd ""` would succeed: guard it.
+# Work in the session's checkout (hook input cwd, which Claude Code always sends;
+# the process cwd only when it is absent), from its top level.
+# `cd ""` succeeds as a no-op, so guard both empty values: an empty cwd, and
+# rev-parse printing nothing outside a work tree.
 cwd=$(printf '%s' "$input" | jq -r '.cwd // "."' 2>/dev/null) && [ -n "$cwd" ] || exit 0
 cd "$cwd" 2>/dev/null || exit 0
 top=$(git rev-parse --show-toplevel 2>/dev/null) && [ -n "$top" ] && cd "$top" || exit 0
