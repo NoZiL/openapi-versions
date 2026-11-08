@@ -7,7 +7,7 @@
  */
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { createContext, type ReactNode, useContext, useMemo, useRef, useState } from "react";
+import { createContext, type JSX, type ReactNode, useContext, useMemo, useRef, useState } from "react";
 import { type Api, buildApi, type OkCompat } from "../core/api";
 import { createApiClient, fetchBackendVersion } from "../core/client";
 import { type Compat, type CompatOptions, type MajorMeta, resolveCompat } from "../core/compat";
@@ -22,6 +22,27 @@ export interface ApiVersionProviderProps extends CompatOptions {
   loading?: ReactNode;
   /** shown when the backend is outside the supported range */
   renderBlocked?: (compat: Exclude<Compat, OkCompat>) => ReactNode;
+}
+
+export interface FeatureProps<G extends string> {
+  requires: G;
+  children: ReactNode;
+  fallback?: ReactNode;
+}
+
+/** Provider and hooks bound to one generated contract, returned by `createReactBindings`. */
+export interface ReactBindings<P extends {}, G extends string, F extends string> {
+  ApiVersionProvider: (props: ApiVersionProviderProps) => JSX.Element;
+  /** const { $api, $gated, gate } = useApi() */
+  useApi: () => Api<P, G>;
+  /** Date after which the backend stops serving this major (from the `Sunset` header) */
+  useSunset: () => Date | undefined;
+  /** Is this operation available on the connected backend? */
+  useSupports: (op: G) => boolean;
+  /** Does the connected backend send this field? */
+  useHasField: (field: F) => boolean;
+  /** Renders `children` only when the backend supports `requires`, else `fallback` */
+  Feature: (props: FeatureProps<G>) => JSX.Element;
 }
 
 function defaultBlocked(c: Exclude<Compat, OkCompat>): ReactNode {
@@ -39,7 +60,7 @@ function defaultBlocked(c: Exclude<Compat, OkCompat>): ReactNode {
   }
 }
 
-export function createReactBindings<P extends {}, G extends string, F extends string>(meta: MajorMeta) {
+export function createReactBindings<P extends {}, G extends string, F extends string>(meta: MajorMeta): ReactBindings<P, G, F> {
   const majors = { [meta.major]: meta };
   const ApiContext = createContext<Api<P, G> | null>(null);
   /** Date after which the backend stops serving this app's major (from the Sunset header) */
@@ -123,7 +144,7 @@ export function createReactBindings<P extends {}, G extends string, F extends st
   const useSupports = (op: G) => useApi().compat.supports(op);
   const useHasField = (field: F) => useApi().compat.hasField(field);
 
-  function Feature({ requires, children, fallback = null }: { requires: G; children: ReactNode; fallback?: ReactNode }) {
+  function Feature({ requires, children, fallback = null }: FeatureProps<G>) {
     return <>{useSupports(requires) ? children : fallback}</>;
   }
 
