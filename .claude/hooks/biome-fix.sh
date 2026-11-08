@@ -2,16 +2,28 @@
 # PostToolUse (Edit|Write|MultiEdit): safe Biome fixes on the changed file, then
 # report what remains. Never --unsafe. Files Biome ignores (see biome.json) are skipped.
 project=${CLAUDE_PROJECT_DIR:-$(pwd)}
-file=$(jq -r '.tool_input.file_path // empty')
-[ -n "$file" ] && [ -f "$file" ] || exit 0
+input=$(cat)
+file=$(printf '%s' "$input" | jq -r '.tool_input.file_path // empty')
+[ -n "$file" ] || exit 0
+# A relative file_path is relative to the session's cwd (hook input), not to this
+# process's (mise starts the task in the directory of mise.toml); with no or an
+# empty cwd, fall back to the process cwd.
+case "$file" in
+  /*) ;;
+  *) cwd=$(printf '%s' "$input" | jq -r '.cwd // empty')
+     file="${cwd:-.}/$file" ;;
+esac
+[ -f "$file" ] || exit 0
 # Run Biome from the top level of the worktree holding the file, which may not be
 # the session's (Orca worktrees): Biome panics on a path outside its root.
 # Skip files outside any worktree of this repository.
 dir=$(dirname "$file")
 root=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null) && [ -n "$root" ] || exit 0
 # Pass Biome a path relative to that top level: always under its root, even when
-# file_path is relative or goes through a symlink (git resolves both).
-rel="$(git -C "$dir" rev-parse --show-prefix)$(basename "$file")" || exit 0
+# the absolute path goes through a symlink (git resolves it). The ./ keeps a
+# name starting with - a path for any tool (Biome 2.6 already accepts one).
+prefix=$(git -C "$dir" rev-parse --show-prefix 2>/dev/null) || exit 0
+rel="./$prefix$(basename "$file")"
 common() { git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null; }
 c=$(common "$dir") && [ -n "$c" ] && [ "$c" = "$(common "$project")" ] || exit 0
 cd "$root" || exit 0
