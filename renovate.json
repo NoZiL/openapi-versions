@@ -44,6 +44,11 @@
       "automerge": false
     },
     {
+      "description": "TypeScript 7 (native port) ships no JS compiler API, so openapi-typescript crashes in codegen; hold until upstream supports it (see blocked-upstream issue)",
+      "matchPackageNames": ["typescript"],
+      "allowedVersions": "<7"
+    },
+    {
       "description": "majors never automerge and are easy to spot",
       "matchUpdateTypes": ["major"],
       "labels": ["major"],
