@@ -24,20 +24,14 @@ root=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null) && [ -n "$root" ] ||
 # name starting with - a path for any tool (Biome 2.6 already accepts one).
 prefix=$(git -C "$dir" rev-parse --show-prefix 2>/dev/null) || exit 0
 rel="./$prefix$(basename "$file")"
-# The common dir, absolute and resolved, from the top level (older git prints
-# --git-common-dir relative to it; --path-format=absolute needs git 2.31).
-common() {
-  # No CDPATH: a relative .git must resolve against the top level only.
-  (unset CDPATH; t=$(git -C "$1" rev-parse --show-toplevel 2>/dev/null) && [ -n "$t" ] && cd -P -- "$t" \
-    && d=$(git rev-parse --git-common-dir 2>/dev/null) && [ -n "$d" ] && cd -P -- "$d" && pwd -P)
-}
+. "$(dirname "$0")/repo.sh"
 # A project dir outside any repository would skip every file. Say so on stderr
 # (exit 0: Claude Code shows it in the transcript view only).
-pc=$(common "$project") && [ -n "$pc" ] || {
+pc=$(repo_common "$project") && [ -n "$pc" ] || {
   echo "biome-fix: skipped $file: project dir $project is not in a git repository" >&2
   exit 0
 }
-c=$(common "$dir") && [ -n "$c" ] && [ "$c" = "$pc" ] || exit 0
+repo_same "$dir" "$project" || exit 0
 cd "$root" || exit 0
 # A worktree without `pnpm install` has no Biome: skip rather than report a lint failure.
 [ -x node_modules/.bin/biome ] || exit 0
