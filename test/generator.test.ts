@@ -1,13 +1,21 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import { build } from "../codegen/build";
 import { validateConfig } from "../codegen/config";
 import { type GeneratorName, isNotInstalled, loadGenerator, selectGenerator } from "../codegen/generator";
 import { openEnums, openEnumsIr } from "../codegen/open-enums";
 
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "openapi-versions-"));
+const dirs: string[] = [];
+const tmp = () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "openapi-versions-"));
+  dirs.push(dir);
+  return dir;
+};
+afterAll(() => {
+  for (const dir of dirs) fs.rmSync(dir, { recursive: true, force: true });
+});
 const generate = async (generator: "openapi-typescript" | "openapi-typesafe", specsDir: string, floor: string) => {
   const outDir = tmp();
   await build({ specsDir, outDir, majors: { [floor.split(".")[0]]: { floor } }, generator, gate: "off" }, { log: () => {} });
@@ -35,9 +43,10 @@ describe("generator parity", () => {
     expect(out).toContain(`composed?: ("a" | "b" | (string & {})) & unknown;`);
   });
 
-  it("leaves other schemas to the generator", () => {
+  it("leaves other schemas to the generator", async () => {
+    const ir = openEnumsIr(await import("openapi-typesafe"));
     for (const schema of [{ type: "string", enum: ["a"] }, { type: "integer", "x-extensible-enum": [1] }, { type: "string" }]) {
-      expect(openEnumsIr(schema)).toBeUndefined();
+      expect(ir(schema)).toBeUndefined();
       expect(openEnums(schema)).toBeUndefined();
     }
   });

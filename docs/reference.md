@@ -11,7 +11,7 @@ File: `openapi-versions.config.json`. JSON Schema: [`openapi-versions.schema.jso
 | `majors`           | object                                        | Keyed by major number (`"1"`). Normally one entry per app release.                                                                                                             |
 | `majors.<n>.floor` | plain semver                                  | Oldest supported minor of major `n`. Must be in major `n` and must have a spec file.                                                                                           |
 | `gate`             | `"auto"` \| `"required"` \| `"off"`, optional | Breaking-change gate. `auto` (default): run oasdiff if installed, otherwise warn and skip. `required`: fail when oasdiff is missing or older than 1.34.0. `off`: never run it. |
-| `generator`        | `"openapi-typescript"` \| `"openapi-typesafe"`, optional | Generator that writes `schema.d.ts`. Default: the one installed; openapi-typescript if both are. openapi-typesafe supports TypeScript 5.4 to 7 and needs no helpers patch ([ADR 0017](adr/0017-support-openapi-typescript-and-openapi-typesafe.md)). |
+| `generator`        | `"openapi-typescript"` \| `"openapi-typesafe"`, optional | Generator that writes `schema.d.ts`. Default: the one installed; openapi-typescript if both are. openapi-typesafe supports TypeScript 5.4 to 7, needs no helpers patch and needs Node 22.12 or newer ([ADR 0017](adr/0017-support-openapi-typescript-and-openapi-typesafe.md)). |
 | `runtimeImport`    | string, optional                              | Module the generated `client.ts` imports the runtime from. Default `openapi-versions`. A relative path when developing the runtime in the same repo.                           |
 
 ## CLI

@@ -31,12 +31,20 @@ function extensibleEnum(schema: unknown): { values: string[]; nullable: boolean 
 
 let ts: typeof TS | undefined;
 
+/** The typescript openapi-typescript prints with when it can be found from here, otherwise our own. */
+function loadTypescript(): typeof TS {
+  try {
+    return createRequire(require.resolve("openapi-typescript"))("typescript") as typeof TS;
+  } catch {
+    return require("typescript") as typeof TS;
+  }
+}
+
 /** openapi-typescript `transform`: returns a TypeScript node. */
 export const openEnums = (schema: unknown, _options?: unknown): TS.TypeNode | undefined => {
   const e = extensibleEnum(schema);
   if (!e) return undefined;
-  // the same typescript openapi-typescript prints with, not necessarily ours
-  ts ??= createRequire(require.resolve("openapi-typescript"))("typescript") as typeof TS;
+  ts ??= loadTypescript();
   const f = ts.factory;
   const literals = e.values.map((v) => f.createLiteralTypeNode(f.createStringLiteral(v)));
   const openString = f.createIntersectionTypeNode([f.createKeywordTypeNode(ts.SyntaxKind.StringKeyword), f.createTypeLiteralNode([])]);
@@ -48,14 +56,17 @@ export const openEnums = (schema: unknown, _options?: unknown): TS.TypeNode | un
 // inline `import()` types, not an `import type` statement: the bundled .d.ts must not import an optional peer
 type Typesafe = typeof import("openapi-typesafe");
 type IrType = ReturnType<Typesafe["tsUnion"]>;
-let typesafe: Typesafe | undefined;
 
-/** openapi-typesafe `transform` with `irCallbacks: true`: returns an IR type. Internal: not exported from the package. */
-export const openEnumsIr = (schema: unknown): IrType | undefined => {
-  const e = extensibleEnum(schema);
-  if (!e) return undefined;
-  typesafe ??= require("openapi-typesafe") as Typesafe;
-  const { tsUnion, tsIntersection, tsLiteral, STRING, NULL } = typesafe;
-  const emptyObject: IrType = { kind: "object", members: [] };
-  return tsUnion([...e.values.map((v) => tsLiteral(v)), tsIntersection([STRING, emptyObject]), ...(e.nullable ? [NULL] : [])]);
-};
+/**
+ * openapi-typesafe `transform` with `irCallbacks: true`, built from the module the generator already imported
+ * (one module instance, not an ESM and a CJS copy). Internal: not exported from the package.
+ */
+export const openEnumsIr =
+  ({ tsUnion, tsIntersection, tsLiteral, STRING, NULL }: Typesafe) =>
+  (schema: unknown): IrType | undefined => {
+    const e = extensibleEnum(schema);
+    if (!e) return undefined;
+    // no public helper builds `{}`; the parity test fails if this shape stops printing as `{}`
+    const emptyObject: IrType = { kind: "object", members: [] };
+    return tsUnion([...e.values.map((v) => tsLiteral(v)), tsIntersection([STRING, emptyObject]), ...(e.nullable ? [NULL] : [])]);
+  };

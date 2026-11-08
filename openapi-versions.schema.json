@@ -50,7 +50,7 @@
     "generator": {
       "type": "string",
       "enum": ["openapi-typescript", "openapi-typesafe"],
-      "description": "Generator that writes schema.d.ts. Leave unset to use the one installed; if both are installed, openapi-typescript is used. openapi-typesafe supports TypeScript 5.4 to 7 and needs no helpers patch (ADR 0017)."
+      "description": "Generator that writes schema.d.ts. Leave unset to use the one installed; if both are installed, openapi-typescript is used. openapi-typesafe supports TypeScript 5.4 to 7, needs no helpers patch and needs Node 22.12 or newer (ADR 0017)."
     },
     "runtimeImport": {
       "type": "string",

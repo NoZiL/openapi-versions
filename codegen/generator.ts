@@ -16,7 +16,7 @@ export interface Generator {
 }
 
 const INSTALL_HINT =
-  "Install one as a dev dependency: `npm i -D openapi-typescript` (the default) or `npm i -D openapi-typesafe` (TypeScript 5.4 to 7, no helpers patch). See ADR 0017.";
+  "Install one as a dev dependency: `npm i -D openapi-typescript` (the default) or `npm i -D openapi-typesafe` (TypeScript 5.4 to 7, no helpers patch, Node 22.12+). See ADR 0017.";
 
 /** Resolves the configured generator, or detects the installed one. */
 export const loadGenerator = (name?: GeneratorName) => selectGenerator(name, tryLoad);
@@ -41,11 +41,9 @@ export async function selectGenerator(
 async function tryLoad(name: GeneratorName): Promise<Generator | undefined> {
   try {
     if (name === "openapi-typesafe") {
-      const { default: openapiTS, astToString } = await import("openapi-typesafe");
-      return {
-        name,
-        generate: async (doc) => astToString(await openapiTS(doc, { irCallbacks: true, transform: openEnumsIr, silent: true })),
-      };
+      const mod = await import("openapi-typesafe");
+      const transform = openEnumsIr(mod);
+      return { name, generate: async (doc) => mod.astToString(await mod.default(doc, { irCallbacks: true, transform, silent: true })) };
     }
     const { default: openapiTS, astToString } = await import("openapi-typescript");
     return { name, generate: async (doc) => astToString(await openapiTS(doc, { transform: openEnums, silent: true })) };
