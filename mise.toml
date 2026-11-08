@@ -21,10 +21,18 @@ run = "pnpm lint"
 [tasks."lint:workflows"]
 description = "Lint GitHub Actions workflows"
 run = "actionlint"
+# typecheck and test read both generated dirs, and `pnpm typecheck` / `pnpm test` each start
+# with `rm -rf` + codegen. mise runs deps in parallel, so one could delete the dir while the
+# other reads it (#62). Here codegen runs once as a shared dep and the tasks only read.
+[tasks.codegen]
+description = "Regenerate playground/generated and test/fixtures/generated"
+run = "pnpm codegen"
 [tasks.typecheck]
-run = "pnpm typecheck"
+depends = ["codegen"]
+run = "pnpm exec tsc --noEmit"
 [tasks.test]
-run = "pnpm test"
+depends = ["codegen"]
+run = "pnpm exec vitest run"
 [tasks."check:breaking"]
 run = "pnpm check:breaking"
 [tasks.build]

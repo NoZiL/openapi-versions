@@ -34,7 +34,7 @@ fi
 # Skip the slow checks when nothing they read changed since the last green run.
 # inputs = HEAD + tracked diff + untracked paths and contents + what pnpm
 # installed (its copy of the lockfile; gitignored, so not in the diff).
-# generated = the codegen dirs; typecheck and test regenerate them from the inputs.
+# generated = the codegen dirs; check:fast regenerates them from the inputs.
 # Each prints nothing if hashing fails (e.g. a file vanished), so the cache never hits.
 inputs() {
   s=$(git rev-parse HEAD && git diff --binary --no-ext-diff --no-textconv HEAD \
