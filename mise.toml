@@ -26,7 +26,8 @@ run = "actionlint"
 # scripts that only read (ADR 0020, #62). Codegen replaces files in place, so a reader
 # outside this run never sees a missing file either (ADR 0021, #79).
 # `pnpm typecheck:tsc` and `pnpm test:run` run no codegen: on their own they need the
-# generated dirs to exist already. stop-check.test.sh asserts these depends.
+# generated dirs to exist already. stop-check.test.sh asserts these depends and run lines
+# (by hand until the hook tests run in CI, #72).
 [tasks."codegen:playground"]
 run = "pnpm codegen:playground"
 [tasks."codegen:test"]

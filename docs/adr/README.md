@@ -6,8 +6,8 @@ One file per decision, `NNNN-title.md`, [MADR](https://adr.github.io/madr/) styl
 
 Accepted ADRs are immutable. To change one, add a new ADR that either:
 
-- **supersedes** it: the new ADR replaces the whole decision. Set the old one's status to `superseded by NNNN` (the only edit an accepted ADR gets).
-- **amends** it: the new ADR changes or extends part of the decision and the rest still stands. The amending ADR names the ADR and the part it changes on an `- Amends:` line under its status (ADRs before 0022 say it in the title or the first sentence of Context instead). The amended ADR is not edited; its row in the index below gets `amended by NNNN` in the status column, so a reader of the old ADR finds the change from here. Read an amended ADR together with its amendments.
+- **supersedes** it: the new ADR replaces the whole decision and says so on a `- Supersedes:` line under its status. Set the old one's status to `superseded by NNNN` (the only edit an accepted ADR gets).
+- **amends** it: the new ADR changes or extends part of the decision and the rest still stands. The amending ADR names the ADR and the part it changes on an `- Amends:` line under its status (some older ADRs, such as 0014, 0015, 0018, 0020 and 0021, say it in the title or the first sentence of Context instead). The amended ADR is not edited; its row in the index below gets `amended by NNNN` in the status column, so a reader of the old ADR finds the change from here. Read an amended ADR together with its amendments.
 
 ## When to write one
 
@@ -45,4 +45,4 @@ Small fixes, dependency bumps and refactors need none. Take the next free number
 | [0019](0019-open-enums-ir-node-on-typesafe-path.md) | The openapi-typesafe open-enum transform returns an IR node, not type text; parity ignores `\uXXXX` escaping; amends 0017 | accepted |
 | [0020](0020-check-fast-runs-codegen-once.md) | `check:fast` runs each codegen once as a shared mise dependency; typecheck and test only read; amends 0014, 0015 | accepted, amended by 0021 |
 | [0021](0021-codegen-replaces-files-in-place.md) | Codegen replaces generated files atomically in place, skips unchanged ones, prunes dropped majors; no `rm -rf` first; amends 0020 | accepted |
-| [0022](0022-stop-hook-runs-mise-locked.md) | Stop hook runs `check:fast` with `MISE_LOCKED`; both lockfile guards stay in the hook, not the task; amends 0014 | accepted |
+| [0022](0022-stop-hook-no-mise-auto-install.md) | Stop hook turns off mise's tool auto-install so `mise.lock` is never rewritten; both lockfile guards stay in the hook, not the task; amends 0014 | accepted |

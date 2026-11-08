@@ -3,10 +3,14 @@
 # red (lint, typecheck, test), skipping the checks if their inputs are unchanged
 # since the last green run (ADRs 0013, 0015). oasdiff and build stay CI-only (ADR 0004).
 # stop_hook_active is true on the retry after a block, so we never loop.
+input=$(cat) # read stdin first, even when exiting early
 # jq parses the input: without it every check below would be skipped unnoticed.
-# Exit 1 is a non-blocking error that Claude Code shows the user.
-command -v jq >/dev/null 2>&1 || { echo "stop-check: jq not found on PATH; checks skipped (mise install)" >&2; exit 1; }
-input=$(cat)
+# Exit 1 is a non-blocking error that Claude Code shows the user. jq comes from
+# mise.toml, and this hook does not run through mise.
+command -v jq >/dev/null 2>&1 || {
+  echo "stop-check: jq not found on PATH, checks skipped. Activate mise in the shell that starts Claude Code (mise install if jq is not installed)." >&2
+  exit 1
+}
 [ "$(printf '%s' "$input" | jq -r '.stop_hook_active // false' 2>/dev/null)" = "true" ] && exit 0
 
 # Work in the session's checkout (hook input cwd, which Claude Code always sends;
@@ -70,9 +74,10 @@ k=$(key "$before")
 if [ -z "$k" ] || [ "$(cat "$cache" 2>/dev/null)" != "$k" ]; then
   # Neither tool may edit the tree (ADRs 0014, 0022). pnpm re-syncs pnpm-lock.yaml
   # and node_modules before a script when they are out of date: fail instead.
-  # mise installs a missing tool before a task and records a version the lockfile
-  # lacks in mise.lock: MISE_LOCKED installs only what mise.lock already pins.
-  if out=$(MISE_LOCKED=true pnpm_config_verify_deps_before_run=error mise run check:fast 2>&1); then
+  # mise installs a missing tool before a task and writes a version mise.lock lacks
+  # into it: turn the auto-install off (MISE_LOCKED instead warns about every
+  # global tool mise.lock does not pin).
+  if out=$(MISE_TASK_RUN_AUTO_INSTALL=false pnpm_config_verify_deps_before_run=error mise run check:fast 2>&1); then
     # Record green only if no input changed during the run (another tool, a
     # second session in this worktree). The key takes the generated dirs as the
     # checks left them, so regenerated output does not cost another run.
@@ -87,10 +92,11 @@ if [ -z "$k" ] || [ "$(cat "$cache" 2>/dev/null)" != "$k" ]; then
     printf '%s' "$out" | grep -q ERR_PNPM_VERIFY_DEPS_BEFORE_RUN \
       && hint="Dependencies not installed or out of date (no node_modules, or package.json, pnpm-lock.yaml or pnpm-workspace.yaml changed since the last install): run pnpm install.
 "
-    # Locked, mise skips a tool whose version (or this platform's URL) mise.lock
-    # lacks. That may be unrelated to the failure, so the hint says "if".
-    printf '%s' "$out" | grep -qE '^mise (WARN|ERROR).*lockfile' \
-      && hint="${hint}mise could not install a tool from mise.lock (version or platform missing). If the failure comes from a missing tool, run mise install (it updates mise.lock).
+    # Tools from this project's mise.toml that are not installed (the run did not
+    # install them). Global tools are left out: the checks do not use them.
+    missing=$(mise ls --local --missing 2>/dev/null | awk '{printf "%s%s@%s", (NR > 1 ? ", " : ""), $1, $2}')
+    [ -z "$missing" ] \
+      || hint="${hint}Tools from mise.toml not installed, so the checks ran without them: $missing. Run mise install (it updates mise.lock for a new version).
 "
     reasons="${reasons:+$reasons
 

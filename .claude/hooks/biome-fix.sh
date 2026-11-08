@@ -27,13 +27,13 @@ rel="./$prefix$(basename "$file")"
 # The common dir, absolute and resolved, from the top level (older git prints
 # --git-common-dir relative to it; --path-format=absolute needs git 2.31).
 common() {
-  (t=$(git -C "$1" rev-parse --show-toplevel 2>/dev/null) && cd "$t" \
-    && cd "$(git rev-parse --git-common-dir)" 2>/dev/null && pwd -P)
+  (t=$(git -C "$1" rev-parse --show-toplevel 2>/dev/null) && [ -n "$t" ] && cd "$t" \
+    && d=$(git rev-parse --git-common-dir 2>/dev/null) && [ -n "$d" ] && cd "$d" && pwd -P)
 }
-# A CLAUDE_PROJECT_DIR outside any repository would skip every file. Say so on
-# stderr (exit 0: Claude Code shows it in the transcript view only).
+# A project dir outside any repository would skip every file. Say so on stderr
+# (exit 0: Claude Code shows it in the transcript view only).
 pc=$(common "$project") && [ -n "$pc" ] || {
-  echo "biome-fix: skipped $file: CLAUDE_PROJECT_DIR ($project) is not in a git repository" >&2
+  echo "biome-fix: skipped $file: project dir $project is not in a git repository" >&2
   exit 0
 }
 c=$(common "$dir") && [ -n "$c" ] && [ "$c" = "$pc" ] || exit 0

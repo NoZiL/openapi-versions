@@ -13,8 +13,11 @@ fails=0
 # test read them, and that typecheck and test run no codegen of their own (ADRs
 # 0015, 0020): that holds only through these mise depends and run lines. Checked
 # against the real mise.toml, before the stub replaces mise.
-tasks=$(mise -C "$root" tasks ls --json 2>/dev/null \
-  | jq -r '.[] | "\(.name) depends=\(.depends // [] | sort | join(",")) run=\(.run // [] | join(";"))"' 2>/dev/null) || tasks=""
+err=$(mktemp)
+tasks=$(mise -C "$root" tasks ls --json 2> "$err" \
+  | jq -r '.[] | "\(.name) depends=\(.depends // [] | sort | join(",")) run=\(.run // [] | join(";"))"' 2>> "$err") || tasks=""
+[ -n "$tasks" ] || echo "note mise tasks ls failed (is mise installed and mise.toml trusted?): $(cat "$err")"
+rm -f "$err"
 # want_task <task> <expected "depends=... run=..." line>
 want_task() {
   got=$(printf '%s\n' "$tasks" | grep "^$1 " || true)
@@ -49,9 +52,11 @@ echo lock > node_modules/.pnpm/lock.yaml
 mkdir "$tmp/bin"
 cat > "$tmp/bin/mise" <<'EOF'
 #!/bin/sh
+# `mise ls --local --missing` prints $MISSING (the hook asks only after a red run).
+[ "$*" = "ls --local --missing" ] && { [ -z "${MISSING:-}" ] || printf '%s\n' "$MISSING"; exit 0; }
 [ "$*" = "run check:fast" ] || { echo "unexpected: mise $*" >&2; exit 2; }
 echo run >> "$COUNT"
-echo "MISE_LOCKED=${MISE_LOCKED:-} verify=${pnpm_config_verify_deps_before_run:-}" > "$COUNT.env"
+echo "auto-install=${MISE_TASK_RUN_AUTO_INSTALL:-} verify=${pnpm_config_verify_deps_before_run:-}" > "$COUNT.env"
 [ -z "${DURING:-}" ] || sh -c "$DURING"
 [ -z "${OUT:-}" ] || printf '%s\n' "$OUT"
 exit "${CHECK_RC:-0}"
@@ -120,25 +125,28 @@ unset CHECK_RC
 expect ran "red run is not cached"
 
 # Neither pnpm nor mise may edit the tree during the checks (ADRs 0014, 0022).
-[ "$(cat "$count.env")" = "MISE_LOCKED=true verify=error" ] && echo "ok   checks run with MISE_LOCKED and verify-deps=error" \
+[ "$(cat "$count.env")" = "auto-install=false verify=error" ] && echo "ok   checks run with mise auto-install off and verify-deps=error" \
   || { echo "FAIL checks env: $(cat "$count.env")"; fails=$((fails + 1)); }
 
 # A red run's reason gets a hint for the two install errors, and none otherwise.
-# hint <name> <mise output> <expected text in the reason, or "none">
+# hint <name> <mise output> <missing tools> <expected text in the reason, or "none">
 hint() {
   echo edit >> work.txt
-  export CHECK_RC=1 OUT="$2"
+  export CHECK_RC=1 OUT="$2" MISSING="$3"
   echo '{}' | sh "$hook" > "$tmp/out"
-  unset CHECK_RC OUT
+  unset CHECK_RC OUT MISSING
   r=$(jq -r .reason "$tmp/out")
-  case "$3" in
+  case "$4" in
     none) printf '%s' "$r" | grep -q '^mise run check:fast failed' && ! printf '%s' "$r" | grep -qE 'run (pnpm|mise) install' ;;
-    *) printf '%s' "$r" | grep -qF "$3" ;;
+    *) printf '%s' "$r" | grep -qF "$4" ;;
   esac && echo "ok   hint: $1" || { echo "FAIL hint: $1: $r"; fails=$((fails + 1)); }
 }
-hint "pnpm deps out of date" " ERR_PNPM_VERIFY_DEPS_BEFORE_RUN  Cannot run" "no node_modules, or package.json, pnpm-lock.yaml or pnpm-workspace.yaml changed since the last install): run pnpm install."
-hint "tool not in mise.lock" "mise WARN  Failed to resolve tool version list for actionlint: [--runtime] actionlint@1.7.11: actionlint@1.7.11 is not in the lockfile" "mise could not install a tool from mise.lock"
-hint "other failure" "error TS2322" none
+hint "pnpm deps out of date" " ERR_PNPM_VERIFY_DEPS_BEFORE_RUN  Cannot run" "" "no node_modules, or package.json, pnpm-lock.yaml or pnpm-workspace.yaml changed since the last install): run pnpm install."
+hint "project tool not installed" "sh: tsc: command not found" "node  27.0.0 (missing)  /repo/mise.toml  27" "not installed, so the checks ran without them: node@27.0.0. Run mise install"
+hint "other failure" "error TS2322" "" none
+# A lockfile warning about a global tool is not a project tool missing.
+hint "global tool warning only" "mise WARN  lefthook@2.1.10 is not in the lockfile
+error TS2322" "" none
 
 # The hook works in the hook input's cwd, not the process cwd.
 echo edit >> work.txt
