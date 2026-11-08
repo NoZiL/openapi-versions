@@ -19,7 +19,7 @@
     "outDir": {
       "type": "string",
       "minLength": 1,
-      "description": "Directory the generated code is written to: <outDir>/v<major>/{schema.d.ts, meta.ts, merged.openapi.json} and <outDir>/index.ts. Safe to delete and regenerate."
+      "description": "Directory the generated code is written to: <outDir>/v<major>/{schema.d.ts, meta.ts, merged.openapi.json, client.ts} and <outDir>/index.ts. Safe to delete and regenerate. Codegen replaces files in place and deletes generated v<major> dirs of majors no longer listed in majors."
     },
     "majors": {
       "type": "object",
