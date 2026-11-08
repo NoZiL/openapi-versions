@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { build } from "../codegen/build";
-import { LOCK_FILE, withOutDirLock } from "../codegen/lock";
+import { LOCK_FILE, PID_NS, withOutDirLock } from "../codegen/lock";
 
 // Codegen's write phase is serialized by a lock file in outDir (ADR 0023).
 
@@ -39,7 +39,10 @@ const snapshot = (dir: string) =>
   );
 const writeLock = (outDir: string, owner: { pid: number; host?: string; ns?: string }, mtime?: Date) => {
   const file = path.join(outDir, LOCK_FILE);
-  fs.writeFileSync(file, JSON.stringify({ host: os.hostname(), token: "someone-else", since: new Date().toISOString(), ...owner }));
+  fs.writeFileSync(
+    file,
+    JSON.stringify({ host: os.hostname(), ns: PID_NS, token: "someone-else", since: new Date().toISOString(), ...owner }),
+  );
   if (mtime) fs.utimesSync(file, mtime, mtime);
   return file;
 };
@@ -85,6 +88,16 @@ describe("codegen write lock (ADR 0023)", () => {
     const outDir = tmp();
     const lock = writeLock(outDir, { pid: process.pid, host: "elsewhere" }, new Date(2000, 0, 1));
     await build(cfg(outDir), quiet);
+    expect(fs.existsSync(lock)).toBe(false);
+  });
+
+  it("treats a garbage lock as ownerless and takes it over once old", async () => {
+    const outDir = tmp();
+    const lock = path.join(outDir, LOCK_FILE);
+    fs.writeFileSync(lock, "null");
+    const old = new Date(2000, 0, 1);
+    fs.utimesSync(lock, old, old);
+    await withOutDirLock(outDir, () => 1);
     expect(fs.existsSync(lock)).toBe(false);
   });
 

@@ -196,29 +196,18 @@ function removeStaleTemps(dir: string): void {
  * failure among them is unlikely; if one does fail, the rest are not renamed and their temps removed.
  */
 function writeChanged(writes: [file: string, content: string][]): void {
-  // tmp undefined: Windows refused the temp, so this file is written in place at rename time
-  const staged: { file: string; tmp?: string; bytes: Buffer }[] = [];
+  const staged: { file: string; tmp: string; bytes: Buffer }[] = [];
   const dropTemps = (from: number) => {
-    for (const { tmp } of staged.slice(from)) if (tmp) fs.rmSync(tmp, { force: true });
+    for (const { tmp } of staged.slice(from)) fs.rmSync(tmp, { force: true });
   };
   try {
     for (const [file, content] of writes) {
       const bytes = Buffer.from(content);
       if (isSame(file, bytes)) continue;
       // unique per write: concurrent runs (other processes, threads, containers) never share a temp
-      const entry: (typeof staged)[number] = {
-        file,
-        tmp: path.join(path.dirname(file), `.${path.basename(file)}.${randomUUID()}.tmp`),
-        bytes,
-      };
-      staged.push(entry);
-      try {
-        fs.writeFileSync(entry.tmp!, bytes);
-      } catch (e) {
-        if (!isWindowsBusy(e)) throw e;
-        fs.rmSync(entry.tmp!, { force: true });
-        entry.tmp = undefined;
-      }
+      const tmp = path.join(path.dirname(file), `.${path.basename(file)}.${randomUUID()}.tmp`);
+      staged.push({ file, tmp, bytes });
+      fs.writeFileSync(tmp, bytes);
     }
   } catch (e) {
     dropTemps(0);
@@ -244,24 +233,17 @@ function isSame(file: string, bytes: Buffer): boolean {
   }
 }
 
-/** Windows refuses to create or replace a file another process (an editor, antivirus, an indexer) holds open. */
-function isWindowsBusy(e: unknown): boolean {
-  const code = (e as NodeJS.ErrnoException).code;
-  return process.platform === "win32" && (code === "EPERM" || code === "EBUSY" || code === "EACCES");
-}
-
-function replace(file: string, tmp: string | undefined, bytes: Buffer): void {
-  if (tmp) {
-    try {
-      fs.renameSync(tmp, file);
-      return;
-    } catch (e) {
-      if (!isWindowsBusy(e)) throw e;
-      fs.rmSync(tmp, { force: true });
-    }
+function replace(file: string, tmp: string, bytes: Buffer): void {
+  try {
+    fs.renameSync(tmp, file);
+  } catch (e) {
+    // Windows refuses to replace a file another process holds open; fall back to an in-place write.
+    // Only here: a temp that cannot be created is a real error and fails while staging.
+    const code = (e as NodeJS.ErrnoException).code;
+    if (process.platform !== "win32" || !(code === "EPERM" || code === "EBUSY" || code === "EACCES")) throw e;
+    fs.rmSync(tmp, { force: true });
+    fs.writeFileSync(file, bytes);
   }
-  // the Windows fallback: an in-place write, as before ADR 0021
-  fs.writeFileSync(file, bytes);
 }
 
 /** Binds the generic runtime to this major's generated types: apps import everything from here. */

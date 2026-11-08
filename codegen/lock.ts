@@ -12,7 +12,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-/** Dot file so tsc, vite and biome globs skip it; build() removes it before returning. */
+/** Dot file so tsc, vite and biome globs skip it. withOutDirLock removes it when done, if it still owns it. */
 export const LOCK_FILE = ".openapi-versions.lock";
 
 interface Owner {
@@ -32,7 +32,8 @@ export interface LockOptions {
   pollMs?: number;
 }
 
-const PID_NS = (() => {
+/** Exported for tests. */
+export const PID_NS: string | undefined = (() => {
   try {
     return fs.readlinkSync("/proc/self/ns/pid");
   } catch {
@@ -76,7 +77,8 @@ function tryCreate(file: string, token: string): boolean {
     const code = (e as NodeJS.ErrnoException).code;
     if (code === "EEXIST") return false;
     // Windows: a lock deleted while another process has it open stays "delete pending" for a moment
-    if (process.platform === "win32" && (code === "EPERM" || code === "EACCES")) return false;
+    // (a real permission error has no file there, so it still throws)
+    if (isWinPending(code) && fs.existsSync(file)) return false;
     throw e;
   }
   try {
@@ -106,7 +108,7 @@ function readLock(file: string): Held | undefined {
     fd = fs.openSync(file, "r");
   } catch (e) {
     const code = (e as NodeJS.ErrnoException).code;
-    if (code === "ENOENT" || (process.platform === "win32" && code === "EPERM")) return undefined;
+    if (code === "ENOENT" || isWinPending(code)) return undefined;
     throw e;
   }
   try {
@@ -114,7 +116,8 @@ function readLock(file: string): Held | undefined {
     const raw = fs.readFileSync(fd, "utf8");
     let owner: Owner | undefined;
     try {
-      owner = JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      owner = parsed && typeof parsed === "object" && typeof parsed.host === "string" ? parsed : undefined;
     } catch {
       owner = undefined;
     }
@@ -148,7 +151,8 @@ function takeOver(file: string, staleRaw: string, staleMs: number): boolean {
   try {
     fs.closeSync(fs.openSync(gate, "wx"));
   } catch (e) {
-    if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
+    const code = (e as NodeJS.ErrnoException).code;
+    if (code !== "EEXIST" && !(isWinPending(code) && fs.existsSync(gate))) throw e;
     // left by a waiter killed mid-takeover, which lasts microseconds
     try {
       if (Date.now() - fs.statSync(gate).mtimeMs > staleMs) fs.rmSync(gate, { force: true });
@@ -168,4 +172,9 @@ function takeOver(file: string, staleRaw: string, staleMs: number): boolean {
 /** Removes the lock only if it is still ours: a holder that ran past `staleMs` may have lost it. */
 function release(file: string, token: string): void {
   if (readLock(file)?.owner?.token === token) fs.rmSync(file, { force: true });
+}
+
+/** Windows: a file deleted while another process has it open stays "delete pending" for a moment. */
+function isWinPending(code: string | undefined): boolean {
+  return process.platform === "win32" && (code === "EPERM" || code === "EACCES");
 }
