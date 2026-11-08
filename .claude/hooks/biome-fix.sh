@@ -12,6 +12,10 @@ root=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null) && [ -n "$root" ] ||
 common() { git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null; }
 c=$(common "$dir") && [ -n "$c" ] && [ "$c" = "$(common "$project")" ] || exit 0
 cd "$root" || exit 0
+# A worktree without `pnpm install` has no Biome: skip rather than report a lint failure.
+[ -x node_modules/.bin/biome ] || exit 0
+# git resolves symlinks in the top level; resolve the file too so it stays under it.
+file="$(cd "$dir" && pwd -P)/$(basename "$file")"
 flags="--no-errors-on-unmatched --files-ignore-unknown=true --colors=off"
 # Fixes cascade (organizeImports then formatting) and Biome needs two passes to converge;
 # then a plain check reports what is left.

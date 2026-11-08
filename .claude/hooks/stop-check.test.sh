@@ -106,10 +106,10 @@ n=$(runs)
 (cd "$tmp" && printf '{"cwd":"%s"}' "$repo" | sh "$hook" > /dev/null)
 [ "$(runs)" -gt "$((n + 1))" ] && { echo "FAIL input cwd: missed the cache"; fails=$((fails + 1)); } || echo "ok   input cwd: hit"
 
-# A cwd outside any work tree (a plain directory, a .git dir): exit 0 quietly, no checks.
+# A cwd outside any work tree (a plain directory, a .git dir, a removed directory): exit 0 quietly, no checks.
 echo edit >> work.txt
 mkdir "$tmp/outside"
-for dir in "$tmp/outside" "$repo/.git"; do
+for dir in "$tmp/outside" "$repo/.git" "$tmp/missing"; do
   n=$(runs)
   rc=0
   (cd "$repo" && printf '{"cwd":"%s"}' "$dir" | sh "$hook" > "$tmp/out" 2> "$tmp/err") || rc=$?

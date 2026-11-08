@@ -17,10 +17,15 @@ newrepo "$tmp/main"
 git -C "$tmp/main" worktree add -q "$tmp/wt" -b wt
 newrepo "$tmp/other"
 mkdir -p "$tmp/main/src" "$tmp/wt/src" "$tmp/plain"
-for f in main/a.ts main/src/b.ts wt/src/c.ts other/d.ts plain/e.ts; do echo x > "$tmp/$f"; done
+mkdir -p "$tmp/main/node_modules/.bin" "$tmp/wt/node_modules/.bin"
+touch "$tmp/main/node_modules/.bin/biome" "$tmp/wt/node_modules/.bin/biome"
+chmod +x "$tmp/main/node_modules/.bin/biome" "$tmp/wt/node_modules/.bin/biome"
+git -C "$tmp/main" worktree add -q "$tmp/bare" -b bare # no node_modules
+ln -s "$tmp/wt" "$tmp/link"
+for f in bare/f.ts main/a.ts main/src/b.ts wt/src/c.ts other/d.ts plain/e.ts; do echo x > "$tmp/$f"; done
 
 # The stub logs "<cwd> <file>" for each Biome call and, like Biome, fails on a
-# file outside its cwd. $BIOME_RC makes the final plain check fail.
+# file outside its cwd (no symlink resolution, as Biome). $BIOME_RC makes the final plain check fail.
 mkdir "$tmp/bin"
 cat > "$tmp/bin/pnpm" <<'STUB'
 #!/bin/sh
@@ -33,12 +38,12 @@ chmod +x "$tmp/bin/pnpm"
 export PATH="$tmp/bin:$PATH" LOG="$log" CLAUDE_PROJECT_DIR="$tmp/main"
 
 fails=0
-# expect <expected cwd, or "none"> <rc> <file> <name>
+# expect <expected cwd, or "none"> <rc> <file> <name> [<file as Biome gets it>]
 expect() {
   : > "$log"
   rc=0
   (cd "$tmp/main" && printf '{"tool_input":{"file_path":"%s"}}' "$3" | sh "$hook" 2> "$tmp/err") || rc=$?
-  if [ "$1" = none ]; then want=""; else want=$(printf '%s %s\n' "$1" "$3" "$1" "$3" "$1" "$3"); fi
+  if [ "$1" = none ]; then want=""; else b=${5:-$3}; want=$(printf '%s %s\n' "$1" "$b" "$1" "$b" "$1" "$b"); fi
   if [ "$(cat "$log")" = "$want" ] && [ "$rc" = "$2" ]; then echo "ok   $4"
   else echo "FAIL $4: rc=$rc, calls: $(cat "$log"), stderr: $(cat "$tmp/err")"; fails=$((fails + 1)); fi
 }
@@ -46,6 +51,8 @@ expect() {
 expect "$tmp/main" 0 "$tmp/main/a.ts" "file in the session's checkout"
 expect "$tmp/main" 0 "$tmp/main/src/b.ts" "file in a subdirectory: runs from the top level"
 expect "$tmp/wt" 0 "$tmp/wt/src/c.ts" "file in another worktree: runs from that worktree"
+expect "$tmp/wt" 0 "$tmp/link/src/c.ts" "file through a symlink: resolved under the top level" "$tmp/wt/src/c.ts"
+expect none 0 "$tmp/bare/f.ts" "worktree without Biome installed: skipped"
 expect none 0 "$tmp/other/d.ts" "file in another repository: skipped"
 expect none 0 "$tmp/plain/e.ts" "file outside any repository: skipped"
 expect none 0 "$tmp/main/missing.ts" "deleted file: skipped"
