@@ -37,7 +37,6 @@ interface Ctx {
 const SCHEMA_MAPS = new Set(["properties", "patternProperties", "$defs", "definitions", "dependentSchemas"]);
 const VALUE_SCHEMAS = new Set(["items", "additionalItems", "additionalProperties", "unevaluatedItems", "unevaluatedProperties"]);
 const CONDITION_SCHEMAS = new Set(["not", "if", "then", "else", "contains", "propertyNames"]);
-const SCHEMA_LITERALS = new Set(["example", "examples", "default", "const", "enum"]);
 
 function childKind(kind: Kind, key: string): Kind {
   if (kind === "literal") return "literal";
