@@ -47,4 +47,4 @@ Small fixes, dependency bumps and refactors need none. Take the next free number
 | [0021](0021-codegen-replaces-files-in-place.md) | Codegen replaces generated files atomically in place, skips unchanged ones, prunes dropped majors; no `rm -rf` first; amends 0020 | accepted, amended by 0023 |
 | [0022](0022-stop-hook-no-mise-auto-install.md) | Claude Code hooks turn off mise's tool auto-install (`MISE_AUTO_INSTALL=false`) so `mise.lock` is never rewritten; the Stop hook blocks on missing project tools before the checks; lockfile guards stay in the hooks; amends 0014 | accepted |
 | [0023](0023-codegen-write-lock.md) | Codegen holds a lock file in `outDir` while writing and stages every changed file before renaming any; amends 0021 | accepted |
-| [0024](0024-stop-hook-adr-block-once-per-policy-change.md) | Stop hook raises the missing-ADR block once per branch and policy content, not every turn; amends 0013 | accepted |
+| [0024](0024-stop-hook-adr-block-once-per-policy-change.md) | Stop hook raises the missing-ADR block once per session and policy content, not every turn; amends 0013 | accepted |

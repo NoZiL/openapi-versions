@@ -238,7 +238,7 @@ else echo "FAIL no jq: rc=$rc, epipe=$([ -e "$tmp/epipe" ] && echo yes || echo n
 # The missing-ADR block is raised once per branch and policy content (ADR 0024).
 # adr <raised|quiet> <name>: run the hook once and check for the ADR reason.
 adr() {
-  echo '{}' | sh "$hook" > "$tmp/out"
+  printf '{"session_id":"%s"}' "${SESSION:-s1}" | sh "$hook" > "$tmp/out"
   jq -r '.reason // empty' "$tmp/out" 2>/dev/null | grep -q '^Policy files changed with no ADR' && got=raised || got=quiet
   if [ "$got" = "$1" ]; then echo "ok   adr: $2"; else echo "FAIL adr: $2: expected $1, got $got"; fails=$((fails + 1)); fi
 }
@@ -253,7 +253,11 @@ adr quiet "then quiet"
 git add biome.json && git commit -qm biome
 adr quiet "committing the same content: not raised again"
 git checkout -qb work2
-adr raised "another branch: raised"
+adr quiet "another branch, same content and session: not raised"
+export SESSION=s2
+adr raised "another session: raised"
+adr quiet "then quiet in that session"
+unset SESSION
 mkdir -p docs/adr && echo adr > docs/adr/0001-x.md
 echo '{"a":2}' > biome.json
 adr quiet "an ADR on the branch: never raised"
@@ -270,6 +274,8 @@ adr quiet "policy file back to the base (absent): nothing to ask"
 git checkout -q biome.json
 echo '{"name":"x","dependencies":{"a":"1"}}' > package.json && git add package.json && git commit -qm pkg
 git checkout -qb work3
+adr raised "branch with a different policy diff: raised"
+adr quiet "then quiet"
 echo '{"name":"x","dependencies":{"a":"2"}}' > package.json
 adr raised "dependency changed: raised"
 adr quiet "then quiet"
