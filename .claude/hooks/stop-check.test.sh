@@ -1,5 +1,5 @@
 #!/bin/sh
-# Tests for stop-check.sh's green-run cache (ADR 0015), in a throwaway repo
+# Tests for stop-check.sh's green-run cache (ADR 0015) and ADR block (ADR 0024), in a throwaway repo
 # with `mise` replaced by a stub on PATH. Run: sh .claude/hooks/stop-check.test.sh
 set -eu
 # Isolate from the caller's git config and repo, and from the Claude session's project.
@@ -234,6 +234,31 @@ rm -f "$tmp/epipe"
 if [ "$rc" = 1 ] && [ "$(runs)" = "$n" ] && grep -q 'jq not found' "$tmp/err" && [ ! -e "$tmp/epipe" ]; then
   echo "ok   no jq: reads stdin, says so, exit 1"
 else echo "FAIL no jq: rc=$rc, epipe=$([ -e "$tmp/epipe" ] && echo yes || echo no), stderr=$(cat "$tmp/err")"; fails=$((fails + 1)); fi
+
+# The missing-ADR block is raised once per branch and policy content (ADR 0024).
+# adr <raised|quiet> <name>: run the hook once and check for the ADR reason.
+adr() {
+  echo '{}' | sh "$hook" > "$tmp/out"
+  jq -r '.reason // empty' "$tmp/out" 2>/dev/null | grep -q '^Policy files changed with no ADR' && got=raised || got=quiet
+  if [ "$got" = "$1" ]; then echo "ok   adr: $2"; else echo "FAIL adr: $2: expected $1, got $got"; fails=$((fails + 1)); fi
+}
+echo '{}' > biome.json
+adr raised "policy file added without an ADR"
+adr quiet "same policy content: not raised again"
+echo edit >> work.txt
+adr quiet "non-policy change: not raised again"
+echo '{"a":1}' > biome.json
+adr raised "policy file changed again: raised"
+adr quiet "then quiet"
+git add biome.json && git commit -qm biome
+adr quiet "committing the same content: not raised again"
+git checkout -qb work2
+adr raised "another branch: raised"
+mkdir -p docs/adr && echo adr > docs/adr/0001-x.md
+echo '{"a":2}' > biome.json
+adr quiet "an ADR on the branch: never raised"
+rm -rf docs/adr
+adr raised "ADR removed: raised for the current content"
 
 n=$(runs)
 echo '{"stop_hook_active":true}' | sh "$hook" > /dev/null

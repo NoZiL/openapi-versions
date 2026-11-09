@@ -1,7 +1,9 @@
 #!/bin/sh
 # Stop: block once if a policy file changed without an ADR, or if the tree is
 # red (lint, typecheck, test), skipping the checks if their inputs are unchanged
-# since the last green run (ADRs 0013, 0015). oasdiff and build stay CI-only (ADR 0004).
+# since the last green run (ADRs 0013, 0015). The ADR block is raised once per
+# branch and policy content, not on every turn (ADR 0024). oasdiff and build
+# stay CI-only (ADR 0004).
 # stop_hook_active is true on the retry after a block, so we never loop.
 input=$(cat) # read stdin first, even when exiting early
 # jq parses the input: without it every check below would be skipped unnoticed.
@@ -37,10 +39,30 @@ if printf '%s\n' "$changed" | grep -qx 'package.json' \
   policy="${policy:+$policy
 }package.json (dependencies)"
 fi
+# Raised once per branch and policy content: the agent's answer to the block is
+# the acknowledgement, and only a further policy change raises it again.
+# ack = branch + each policy path with its blob hash (or the dependency sections).
+policy_state() {
+  git symbolic-ref -q --short HEAD || echo "(detached)"
+  printf '%s\n' "$policy" | while IFS= read -r p; do
+    case $p in
+      "package.json (dependencies)") printf '%s\n' "$p"; deps_of < package.json ;;
+      *) printf '%s ' "$p"; git hash-object -- "$p" 2>/dev/null || echo deleted ;;
+    esac
+  done
+}
+gitdir=$(git rev-parse --absolute-git-dir)
+ack_file="$gitdir/claude-stop-adr"
+ack=""
 if [ -n "$policy" ] && ! printf '%s\n' "$changed" | grep -q '^docs/adr/'; then
-  reasons="Policy files changed with no ADR under docs/adr/:
+  ack=$(policy_state | shasum | cut -d' ' -f1)
+  if [ "$(cat "$ack_file" 2>/dev/null)" != "$ack" ]; then
+    reasons="Policy files changed with no ADR under docs/adr/:
 $policy
-Read docs/adr/README.md; add an ADR or say why not."
+Read docs/adr/README.md; add an ADR or say why not. This is asked once; it is raised again only if these files change."
+  else
+    ack=""
+  fi
 fi
 
 # Skip the slow checks when nothing they read changed since the last green run.
@@ -68,7 +90,7 @@ key() { # <inputs hash>: empty if the inputs hash is empty
   g=$(hash_files playground/generated test/fixtures/generated) || return 0
   printf '%s\n%s' "$1" "$g" | shasum | cut -d' ' -f1
 }
-cache="$(git rev-parse --absolute-git-dir)/claude-stop-check"
+cache="$gitdir/claude-stop-check"
 before=$(inputs)
 k=$(key "$before")
 # Neither tool may edit the tree (ADRs 0014, 0022). mise installs missing tools
@@ -109,4 +131,6 @@ $(printf '%s\n' "$out" | tail -40)"
 fi
 
 [ -n "$reasons" ] || exit 0
+# Record the ADR block as raised (ack is set only when it is in reasons).
+[ -z "$ack" ] || printf '%s' "$ack" > "$ack_file" 2>/dev/null || :
 jq -n --arg r "$reasons" '{decision:"block",reason:$r}'
