@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { checkChain, probeOasdiff } from "../codegen/breaking";
 import { BreakingChangeError, build } from "../codegen/build";
 import { validateConfig } from "../codegen/config";
-import { mergeAll } from "../codegen/merge";
+import { mergeAll, mergeTolerant } from "../codegen/merge";
 import { computeSince } from "../codegen/since";
 
 const load = (v: string, dir = "test/fixtures/specs") => ({ version: v, doc: JSON.parse(fs.readFileSync(`${dir}/${v}.json`, "utf8")) });
@@ -50,7 +50,7 @@ describe("tolerant merge", () => {
       }
     });
 
-    it.skipIf(!hasOasdiff)("which the breaking-change gate lets through", () => {
+    it.skipIf(!hasOasdiff)("which the gate lets through", () => {
       expect(checkChain(["1.0.0", "1.1.0"].map((version) => ({ version, file: `${dir}/${version}.json` })))[0].ok).toBe(true);
     });
 
@@ -66,6 +66,43 @@ describe("tolerant merge", () => {
       } finally {
         fs.rmSync(outDir, { recursive: true, force: true });
       }
+    });
+  });
+
+  describe("reads keywords only where they are keywords", () => {
+    const doc = (openapi: string, extra: Record<string, unknown>) => ({ openapi, ...extra });
+    const nullableOld = { type: "object", required: ["a"], properties: { a: { type: "string" }, b: { type: ["string", "null"] } } };
+    const narrowedNew = { type: "object", required: ["a", "b"], properties: { a: { type: "string" }, b: { type: "string" } } };
+    const expected = { type: "object", required: ["a"], properties: { a: { type: "string" }, b: { type: ["string", "null"] } } };
+    const json = (schema: unknown) => ({ content: { "application/json": { schema } } });
+
+    it("in a `default` response and properties named `default`, `enum`, `example`", () => {
+      const at = (schema: unknown) =>
+        doc("3.1.0", {
+          paths: { "/p": { get: { responses: { default: json(schema) } } } },
+          components: { schemas: { S: { type: "object", properties: { default: schema, enum: schema, example: schema } } } },
+        });
+      const merged = mergeTolerant(at(nullableOld), at(narrowedNew));
+      expect(merged.paths["/p"].get.responses.default.content["application/json"].schema).toEqual(expected);
+      for (const name of ["default", "enum", "example"]) expect(merged.components.schemas.S.properties[name]).toEqual(expected);
+    });
+
+    it("keeps a header or a component named `required`", () => {
+      const at = () => doc("3.1.0", { components: { headers: { required: { schema: { type: "string" } } } } });
+      expect(mergeTolerant(at(), at()).components.headers.required).toEqual({ schema: { type: "string" } });
+    });
+
+    it("does not widen under `not`, where accepting null would reject it", () => {
+      const at = (not: unknown) => doc("3.1.0", { components: { schemas: { Q: { not } } } });
+      expect(mergeTolerant(at({ type: ["integer", "null"] }), at({ type: "integer" })).components.schemas.Q).toEqual({
+        not: { type: "integer" },
+      });
+    });
+
+    it("lets an explicit type decide over a null enum member", () => {
+      const at = (s: unknown) => doc("3.1.0", { components: { schemas: { E: s } } });
+      const merged = mergeTolerant(at({ type: ["string", "null"], enum: ["a", null] }), at({ type: "string", enum: ["a", "b"] }));
+      expect(merged.components.schemas.E).toEqual({ type: ["string", "null"], enum: ["a", null, "b"] });
     });
   });
 });
