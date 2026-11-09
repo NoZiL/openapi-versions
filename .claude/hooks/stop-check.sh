@@ -40,8 +40,8 @@ if printf '%s\n' "$changed" | grep -qx 'package.json' \
 }package.json (dependencies)"
 fi
 # Raised once per branch and policy content: the agent's answer to the block is
-# the acknowledgement, and only a further policy change raises it again.
-# ack = branch + each policy path with its blob hash (or the dependency sections).
+# the acknowledgement. The keys of blocks already answered are kept in ack_file.
+# key = branch + each policy path with its blob hash (or the dependency sections).
 policy_state() {
   git symbolic-ref -q --short HEAD || echo "(detached)"
   printf '%s\n' "$policy" | while IFS= read -r p; do
@@ -53,15 +53,14 @@ policy_state() {
 }
 gitdir=$(git rev-parse --absolute-git-dir)
 ack_file="$gitdir/claude-stop-adr"
-ack=""
+adr_key="" adr_reason=""
 if [ -n "$policy" ] && ! printf '%s\n' "$changed" | grep -q '^docs/adr/'; then
-  ack=$(policy_state | shasum | cut -d' ' -f1)
-  if [ "$(cat "$ack_file" 2>/dev/null)" != "$ack" ]; then
-    reasons="Policy files changed with no ADR under docs/adr/:
+  adr_key=$(policy_state | shasum | cut -d' ' -f1)
+  if ! grep -qx "$adr_key" "$ack_file" 2>/dev/null; then
+    adr_reason="Policy files changed with no ADR under docs/adr/:
 $policy
-Read docs/adr/README.md; add an ADR or say why not. This is asked once; it is raised again only if these files change."
-  else
-    ack=""
+Read docs/adr/README.md; add an ADR or say why not. This is asked once per policy change."
+    reasons=$adr_reason
   fi
 fi
 
@@ -131,6 +130,12 @@ $(printf '%s\n' "$out" | tail -40)"
 fi
 
 [ -n "$reasons" ] || exit 0
-# Record the ADR block as raised (ack is set only when it is in reasons).
-[ -z "$ack" ] || printf '%s' "$ack" > "$ack_file" 2>/dev/null || :
+# Record the ADR block as answered only when it is the sole reason: blocked
+# together with red checks, the retry may fix those and skip the question, so
+# it is asked again next stop. Keep the last 50 keys; write via temp file + mv.
+if [ -n "$adr_reason" ] && [ "$reasons" = "$adr_reason" ]; then
+  { t=$(mktemp "$ack_file.XXXXXX") \
+    && { { tail -n 49 "$ack_file" 2>/dev/null; echo "$adr_key"; } > "$t" && mv -f "$t" "$ack_file" || rm -f "$t"; }
+  } 2>/dev/null || :
+fi
 jq -n --arg r "$reasons" '{decision:"block",reason:$r}'

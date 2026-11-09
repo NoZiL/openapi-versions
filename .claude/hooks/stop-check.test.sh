@@ -259,6 +259,29 @@ echo '{"a":2}' > biome.json
 adr quiet "an ADR on the branch: never raised"
 rm -rf docs/adr
 adr raised "ADR removed: raised for the current content"
+echo '{"a":3}' > biome.json
+adr raised "edited again: raised"
+echo '{"a":2}' > biome.json
+adr quiet "reverted to an answered state: not raised again"
+git checkout -q work && git checkout -q work2
+adr quiet "branch switched and back: not raised again"
+rm biome.json
+adr quiet "policy file back to the base (absent): nothing to ask"
+git checkout -q biome.json
+echo '{"name":"x","dependencies":{"a":"1"}}' > package.json && git add package.json && git commit -qm pkg
+git checkout -qb work3
+echo '{"name":"x","dependencies":{"a":"2"}}' > package.json
+adr raised "dependency changed: raised"
+adr quiet "then quiet"
+echo '{"name":"y","dependencies":{"a":"2"}}' > package.json
+adr quiet "non-dependency change in package.json: not raised"
+# Blocked together with red checks: not recorded, so asked again.
+echo '{"a":4}' > biome.json
+export CHECK_RC=1
+adr raised "with red checks: raised"
+unset CHECK_RC
+adr raised "after a block with red checks: raised again"
+adr quiet "then quiet"
 
 n=$(runs)
 echo '{"stop_hook_active":true}' | sh "$hook" > /dev/null
