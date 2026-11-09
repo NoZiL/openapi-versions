@@ -69,6 +69,80 @@ describe("tolerant merge", () => {
     });
   });
 
+  // #103: 1.0.0 has Pet.status inline with a value 1.1.0's Status drops (fine for a response), and
+  // Pet.owner a nullable User reference that 1.1.0 inlines; a backend on either minor must be typed
+  const INLINE_STATUS = { type: "string", enum: ["available", "pending", "sold"] };
+  const INLINE_OWNER = { type: "object", required: ["name"], properties: { name: { type: "string" } } };
+  const STATUS = { $ref: "#/components/schemas/Status" };
+  describe.each([
+    [
+      "test/fixtures/reshaped",
+      (u: unknown[]) => ({ anyOf: [...u, { type: "null" }] }),
+      `owner: components["schemas"]["User"] | { name: string; } | null;`,
+    ],
+    [
+      "test/fixtures/reshaped-3.0",
+      (u: unknown[]) => ({ nullable: true, allOf: [{ anyOf: u }] }),
+      `owner: (components["schemas"]["User"] | { name: string; }) | null;`,
+    ],
+  ])("accepts every shape when a schema is reshaped between minors (%s)", (dir, nullableUnion, ownerType) => {
+    const docs = ["1.0.0", "1.1.0"].map((v) => load(v, dir).doc);
+
+    it("in the merged spec, whichever order the minors come in", () => {
+      const [forward, reverse] = [mergeAll(docs), mergeAll([...docs].reverse())].map((m) => m.components.schemas.Pet.properties);
+      expect(forward.status).toEqual({ anyOf: [INLINE_STATUS, STATUS] });
+      expect(forward.owner).toEqual(nullableUnion([REF, INLINE_OWNER]));
+      expect(reverse.status).toEqual({ anyOf: [STATUS, INLINE_STATUS] });
+      expect(reverse.owner).toEqual(nullableUnion([INLINE_OWNER, REF]));
+    });
+
+    it.skipIf(!hasOasdiff)("which the gate lets through", () => {
+      expect(checkChain(["1.0.0", "1.1.0"].map((version) => ({ version, file: `${dir}/${version}.json` })))[0].ok).toBe(true);
+    });
+
+    it.each(["openapi-typescript", "openapi-typesafe"] as const)("in the types generated with %s", async (generator) => {
+      const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "openapi-versions-"));
+      try {
+        await build({ specsDir: dir, outDir, majors: { 1: { floor: "1.0.0" } }, gate: "off", generator }, { log: () => {} });
+        const schema = fs.readFileSync(path.join(outDir, "v1/schema.d.ts"), "utf8").replace(/\s+/g, " ");
+        expect(schema).toContain(`status: ("available" | "pending" | "sold") | components["schemas"]["Status"];`);
+        expect(schema).toContain(ownerType);
+      } finally {
+        fs.rmSync(outDir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  describe("merges a reshaped schema", () => {
+    const at = (openapi: string, s: unknown) => ({ openapi, components: { schemas: { S: s } } });
+    const merge = (a: unknown, b: unknown, openapi = "3.1.0") => mergeTolerant(at(openapi, a), at(openapi, b)).components.schemas.S;
+    const A = { $ref: "#/components/schemas/A" };
+    const B = { $ref: "#/components/schemas/B" };
+
+    it("into one reference when only the null wrapper changed, keeping its annotations", () => {
+      expect(merge({ description: "d", anyOf: [A, { type: "null" }] }, A)).toEqual({ description: "d", anyOf: [A, { type: "null" }] });
+      expect(merge({ oneOf: [{ const: null }, A] }, A)).toEqual({ anyOf: [A, { type: "null" }] });
+    });
+
+    it("into a union when the reference target changes", () => {
+      expect(merge(A, B)).toEqual({ anyOf: [A, B] });
+    });
+
+    it("flattening an existing union instead of nesting it", () => {
+      expect(merge({ anyOf: [A, B] }, { type: "string" })).toEqual({ anyOf: [A, B, { type: "string" }] });
+    });
+
+    it("from inline to `allOf` without mixing their keys", () => {
+      const inline = { type: "object", properties: { a: { type: "string" } } };
+      const composed = { allOf: [A, { type: "object", properties: { b: { type: "string" } } }] };
+      expect(merge(inline, composed)).toEqual({ anyOf: [inline, composed] });
+    });
+
+    it("keeping the newest shape under `not`", () => {
+      expect(merge({ not: A }, { not: { type: "string" } })).toEqual({ not: { type: "string" } });
+    });
+  });
+
   describe("reads keywords only where they are keywords", () => {
     const doc = (openapi: string, extra: Record<string, unknown>) => ({ openapi, ...extra });
     const nullableOld = { type: "object", required: ["a"], properties: { a: { type: "string" }, b: { type: ["string", "null"] } } };
