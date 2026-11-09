@@ -9,7 +9,11 @@
  *  - a schema accepting null in any version:    accepts null (`nullable`, `"null"` in `type`, a null
  *    `anyOf`/`oneOf` member…), so a backend still on an older minor that sends `null` is typed.
  *    oasdiff lets a response drop null; it flags a request doing so, so inputs never get here.
- *  - a schema that is a `$ref` in one version and not in the other: newest wins as a whole
+ *  - `anyOf`/`oneOf` members:                   UNION; a `$ref` in both is merged, an identical member kept once
+ *  - a schema whose shape changes (`$ref` target, `allOf`/`anyOf`/`oneOf`, inline): `anyOf` of both
+ *    shapes, so either is typed. A null wrapper (`anyOf: [{$ref}, {type: "null"}]`, 3.0 `nullable` +
+ *    one `allOf` member) is looked through, so gaining or losing one is not a reshape.
+ *    Under `not`/`if`…, where accepting more rejects more, the newest shape wins.
  *  - everything else (descriptions, formats…):  newest wins
  *
  * Inputs MUST be non-breaking relative to each other (checked by oasdiff first),
@@ -80,6 +84,11 @@ function mergeKeys(older: Record<string, Json>, newer: Record<string, Json>, kin
       if (required !== undefined) out.required = required;
       continue;
     }
+    // a union keeps every member a minor in range has (not under `not`/`if`…, where that would reject more)
+    if (kind === "schema" && ctx.widen && UNIONS.has(key) && Array.isArray(older[key]) && Array.isArray(newer[key])) {
+      out[key] = mergeMembers(older[key], newer[key], ctx);
+      continue;
+    }
     const child = childKind(kind, key);
     out[key] = merge(older[key], newer[key], child, kind === "schema" && CONDITION_SCHEMAS.has(key) ? { ...ctx, widen: false } : ctx);
   }
@@ -97,11 +106,116 @@ function mergeRequired(a: Json, b: Json): Json {
 }
 
 function mergeSchema(older: Record<string, Json>, newer: Record<string, Json>, ctx: Ctx): Json {
-  // reshaped (inlined, or wrapped as `anyOf: [{$ref}, {type: "null"}]`): mixing both shapes' keys
-  // would leave a `$ref` next to the other shape, and generators read only the `$ref`
-  const out = "$ref" in older !== "$ref" in newer ? newer : mergeKeys(older, newer, "schema", ctx);
+  const o = unwrapNull(older);
+  const n = unwrapNull(newer);
+  if (!ctx.widen || (!o.wrapped && !n.wrapped && shape(older) === shape(newer))) {
+    // reshaped under `not`/`if`…: accepting either shape would change what the parent accepts
+    if (shape(older) !== shape(newer)) return newer;
+    return widenNull(mergeKeys(older, newer, "schema", ctx), older, newer, ctx);
+  }
+  // reshaped, or behind a null wrapper: mixing both shapes' keys would leave a `$ref` next to the
+  // other shape (generators read only the `$ref`) or intersect them. Merge what each side wraps,
+  // member by member, so every shape a minor in range sends is typed.
+  const a = unionOf(o.core);
+  const b = unionOf(n.core);
+  // `anyOf`, not `oneOf`: members from different minors can overlap (a newer one may accept more)
+  const members = mergeMembers(a.members, b.members, ctx);
+  let core: Json = members.length === 1 ? members[0] : { anyOf: members };
+  if ((o.nullable || n.nullable) && !acceptsNull(core)) {
+    core = members.length > 1 && !ctx.oas30 ? { anyOf: [...members, { type: "null" }] } : withNull(core, ctx.oas30);
+  }
+  // annotations: newest wins, as everywhere else
+  const notes = { ...o.notes, ...n.notes };
+  return Object.keys(notes).length && isObj(core) ? { ...notes, ...core } : core;
+}
+
+function widenNull(out: Json, older: Json, newer: Json, ctx: Ctx): Json {
   if (!ctx.widen || acceptsNull(out) || !(acceptsNull(older) || acceptsNull(newer))) return out;
   return withNull(out, ctx.oas30);
+}
+
+const COMPOSITIONS = ["allOf", "anyOf", "oneOf"];
+const UNIONS = new Set(["anyOf", "oneOf"]);
+
+/** `$ref` target, composition keywords, or "" for an inline schema: merging key by key is only sound within one shape. */
+function shape(s: Json): string {
+  if (!isObj(s)) return "";
+  if ("$ref" in s) return `$ref ${s.$ref}`;
+  return COMPOSITIONS.filter((k) => k in s).join(",");
+}
+
+/**
+ * Documentation keywords, which describe the field as a whole and may sit next to a null wrapper.
+ * `default`, `example`, `readOnly`, `x-extensible-enum`… stay on their shape: they only hold for it,
+ * and the open-enum transform reads `x-extensible-enum` next to `type`.
+ */
+const ANNOTATIONS = new Set(["title", "description", "deprecated", "externalDocs"]);
+const isAnnotation = (k: string) => ANNOTATIONS.has(k);
+
+const isNullOnly = (s: Json) =>
+  isObj(s) &&
+  (s.type === "null" ||
+    (Array.isArray(s.type) && s.type.length === 1 && s.type[0] === "null") ||
+    (s.type === undefined && (s.const === null || (Array.isArray(s.enum) && s.enum.length === 1 && s.enum[0] === null))));
+
+interface Unwrapped {
+  /** the schema without its annotations, and without its null wrapper if it had one */
+  core: Json;
+  /** a null wrapper was removed: `anyOf`/`oneOf` with a null member, or 3.0 `nullable: true` + one `allOf` member */
+  wrapped: boolean;
+  nullable: boolean;
+  notes: Record<string, Json>;
+}
+
+function unwrapNull(s: Record<string, Json>): Unwrapped {
+  const notes = Object.fromEntries(Object.entries(s).filter(([k]) => isAnnotation(k)));
+  const rest = Object.fromEntries(Object.entries(s).filter(([k]) => !isAnnotation(k)));
+  const keys = Object.keys(rest);
+  if (keys.length === 2 && rest.nullable === true && Array.isArray(rest.allOf) && rest.allOf.length === 1) {
+    return { core: rest.allOf[0], wrapped: true, nullable: true, notes };
+  }
+  if (keys.length === 1 && UNIONS.has(keys[0]) && Array.isArray(rest[keys[0]])) {
+    const kept = rest[keys[0]].filter((m: Json) => !isNullOnly(m));
+    if (kept.length > 0 && kept.length < rest[keys[0]].length) {
+      return { core: kept.length === 1 ? kept[0] : { [keys[0]]: kept }, wrapped: true, nullable: true, notes };
+    }
+  }
+  return { core: rest, wrapped: false, nullable: false, notes };
+}
+
+/** Members of a bare `anyOf`/`oneOf` (no other keywords), else the schema itself. */
+function unionOf(s: Json): { members: Json[] } {
+  const keys = isObj(s) ? Object.keys(s) : [];
+  return { members: keys.length === 1 && UNIONS.has(keys[0]) && Array.isArray(s[keys[0]]) ? s[keys[0]] : [s] };
+}
+
+/** Key-order independent JSON, to compare schemas. */
+const canon = (x: Json): string =>
+  JSON.stringify(x, (_k, v) => (isObj(v) ? Object.fromEntries(Object.entries(v).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) : v));
+
+/**
+ * Which members of two minors' unions are the same member: a reference by its target, anything else
+ * only when identical. Inline members are not paired by `type`: a union of `const`s or of
+ * discriminated objects has several members of one type, and merging them would erase the distinction.
+ */
+function memberKey(m: Json): string {
+  if (isNullOnly(m)) return "null";
+  return isObj(m) && "$ref" in m ? `$ref ${m.$ref}` : canon(m);
+}
+
+/** Union of `anyOf`/`oneOf` members, older first; a reference in both is merged, an identical member kept once. */
+function mergeMembers(older: Json[], newer: Json[], ctx: Ctx): Json[] {
+  const out = [...older];
+  const index = new Map(out.map((m, i) => [memberKey(m), i] as const));
+  for (const m of newer) {
+    const key = memberKey(m);
+    const i = index.get(key);
+    if (i === undefined) {
+      index.set(key, out.length);
+      out.push(m);
+    } else if (key.startsWith("$ref ")) out[i] = merge(out[i], m, "schema", ctx);
+  }
+  return out;
 }
 
 const hasNull = (t: unknown) => t === "null" || (Array.isArray(t) && t.includes("null"));
@@ -112,12 +226,12 @@ function acceptsNull(s: Json): boolean {
   // an explicit type decides: a null in `enum` or `const` does not get past `type: "string"`
   if (s.type !== undefined) return hasNull(s.type);
   if (s.const === null || (Array.isArray(s.enum) && s.enum.includes(null))) return true;
-  return ["anyOf", "oneOf"].some((k) => Array.isArray(s[k]) && s[k].some(acceptsNull));
+  return [...UNIONS].some((k) => Array.isArray(s[k]) && s[k].some(acceptsNull));
 }
 
 /** `s`, also accepting null, in the form the document's OpenAPI version understands. */
 function withNull(s: Record<string, Json>, oas30: boolean): Json {
-  if ("$ref" in s || ["allOf", "anyOf", "oneOf"].some((k) => k in s)) {
+  if ("$ref" in s || COMPOSITIONS.some((k) => k in s)) {
     return oas30 ? { nullable: true, allOf: [s] } : { anyOf: [s, { type: "null" }] };
   }
   if (s.type === undefined) return s; // untyped: already accepts anything
