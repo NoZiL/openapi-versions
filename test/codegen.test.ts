@@ -138,6 +138,38 @@ describe("tolerant merge", () => {
       expect(merge(inline, composed)).toEqual({ anyOf: [inline, composed] });
     });
 
+    const chain = (openapi: string, ...ss: unknown[]) => mergeAll(ss.map((s) => at(openapi, s))).components.schemas.S;
+    const NULL = { type: "null" };
+
+    it("when the reference target changes behind a null wrapper", () => {
+      expect(merge({ anyOf: [A, NULL] }, { anyOf: [B, NULL] })).toEqual({ anyOf: [A, B, NULL] });
+      expect(merge({ nullable: true, allOf: [A] }, { nullable: true, allOf: [B] }, "3.0.3")).toEqual({
+        nullable: true,
+        allOf: [{ anyOf: [A, B] }],
+      });
+    });
+
+    it("keeping every shape over three minors", () => {
+      expect(chain("3.1.0", A, B, { anyOf: [B, NULL] })).toEqual({ anyOf: [A, B, NULL] });
+      expect(chain("3.1.0", A, B, { anyOf: [{ type: "string" }, NULL] })).toEqual({ anyOf: [A, B, { type: "string" }, NULL] });
+      const nullableB = { nullable: true, allOf: [B] };
+      expect(chain("3.0.3", A, nullableB, nullableB)).toEqual({ nullable: true, allOf: [{ anyOf: [A, B] }] });
+    });
+
+    it("keeping every member of a union, merging those in both", () => {
+      expect(merge({ anyOf: [A, B] }, { anyOf: [A, { type: "string" }] })).toEqual({ anyOf: [A, B, { type: "string" }] });
+      const e = (...v: string[]) => ({ enum: v, type: "string" });
+      expect(merge({ oneOf: [A, e("x")] }, { oneOf: [{ type: "string", enum: ["y"] }, A] })).toEqual({ oneOf: [A, e("x", "y")] });
+    });
+
+    it("with the newest annotations, wherever the null wrapper was", () => {
+      expect(merge({ description: "old", anyOf: [A, NULL] }, { description: "new", ...A })).toEqual({
+        description: "new",
+        anyOf: [A, NULL],
+      });
+      expect(merge({ description: "d", ...A }, { type: "object" })).toEqual({ description: "d", anyOf: [A, { type: "object" }] });
+    });
+
     it("keeping the newest shape under `not`", () => {
       expect(merge({ not: A }, { not: { type: "string" } })).toEqual({ not: { type: "string" } });
     });
