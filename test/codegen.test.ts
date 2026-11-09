@@ -29,28 +29,43 @@ describe("tolerant merge", () => {
     expect(merged.paths["/users"].get.parameters).toEqual([{ name: "search", in: "query", required: false, schema: { type: "string" } }]);
   });
 
-  // #98: 1.0.0 declares Pet.nickname (and tag items) nullable, 1.1.0 drops it; oasdiff does not flag
-  // that, and a backend still on 1.0.0 can send null
+  // #98: 1.0.0 declares Pet.nickname, tag items and the Pet.owner reference nullable, 1.1.0 drops
+  // that; oasdiff lets a response do so, and a backend still on 1.0.0 can send null
+  const REF = { $ref: "#/components/schemas/User" };
   describe.each([
-    ["test/fixtures/nullable-narrowing", (s: { type?: unknown }) => expect(s.type).toEqual(["string", "null"])],
-    ["test/fixtures/nullable-narrowing-3.0", (s: { nullable?: unknown }) => expect(s.nullable).toBe(true)],
-  ])("keeps a field nullable if an older minor says so (%s)", (dir, expectNullable) => {
+    ["test/fixtures/nullable-narrowing", { type: ["string", "null"] }, { anyOf: [REF, { type: "null" }] }],
+    ["test/fixtures/nullable-narrowing-3.0", { type: "string", nullable: true }, { nullable: true, allOf: [REF] }],
+  ])("keeps a field nullable if an older minor says so (%s)", (dir, nullableString, nullableRef) => {
     const docs = ["1.0.0", "1.1.0"].map((v) => load(v, dir).doc);
 
     it("in the merged spec, whichever order the minors come in", () => {
       for (const pet of [mergeAll(docs), mergeAll([...docs].reverse())].map((m) => m.components.schemas.Pet)) {
-        expectNullable(pet.properties.nickname);
-        expectNullable(pet.properties.tags.items);
+        expect(pet.properties.nickname).toEqual(nullableString);
+        expect(pet.properties.tags.items).toEqual(nullableString);
+        expect(pet.properties.owner).toEqual(nullableRef);
         expect(pet.properties.id).toEqual({ type: "string" });
+        // a property named like a keyword is a property, not the keyword
+        expect(pet.properties.required).toEqual({ type: "boolean" });
+        expect(pet.required).toEqual(["id", "nickname", "owner", "required"]);
       }
     });
 
-    it("in the generated types", async () => {
+    it.skipIf(!hasOasdiff)("which the breaking-change gate lets through", () => {
+      expect(checkChain(["1.0.0", "1.1.0"].map((version) => ({ version, file: `${dir}/${version}.json` })))[0].ok).toBe(true);
+    });
+
+    it.each(["openapi-typescript", "openapi-typesafe"] as const)("in the types generated with %s", async (generator) => {
       const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "openapi-versions-"));
-      await build({ specsDir: dir, outDir, majors: { 1: { floor: "1.0.0" } }, gate: "off" }, { log: () => {} });
-      const schema = fs.readFileSync(path.join(outDir, "v1/schema.d.ts"), "utf8");
-      expect(schema).toMatch(/nickname: string \| null;/);
-      expect(schema).toMatch(/tags\?: \(string \| null\)\[\];/);
+      try {
+        await build({ specsDir: dir, outDir, majors: { 1: { floor: "1.0.0" } }, gate: "off", generator }, { log: () => {} });
+        const schema = fs.readFileSync(path.join(outDir, "v1/schema.d.ts"), "utf8");
+        expect(schema).toMatch(/nickname: string \| null;/);
+        expect(schema).toMatch(/tags\?: \(string \| null\)\[\];/);
+        expect(schema).toContain(`owner: components["schemas"]["User"] | null;`);
+        expect(schema).toMatch(/required: boolean;/);
+      } finally {
+        fs.rmSync(outDir, { recursive: true, force: true });
+      }
     });
   });
 });

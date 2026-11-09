@@ -35,9 +35,18 @@
   },
   "components": {
     "schemas": {
+      "User": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
+      },
       "Pet": {
         "type": "object",
-        "required": ["id", "nickname"],
+        "required": ["id", "nickname", "owner", "required"],
         "properties": {
           "id": {
             "type": "string"
@@ -50,6 +59,12 @@
             "items": {
               "type": "string"
             }
+          },
+          "owner": {
+            "$ref": "#/components/schemas/User"
+          },
+          "required": {
+            "type": "boolean"
           }
         }
       }
