@@ -78,7 +78,7 @@ const report = await build(loadConfig("openapi-versions.config.json"), { checkOn
 | parameter present in only some versions   | never required (path params stay required)                |
 | `enum`, primitive arrays                  | union of values, order kept                               |
 | a schema that accepts null                | still accepts null if any version did (`nullable: true`, `"null"` in `type`, a null `anyOf`/`oneOf` member); oasdiff lets a response drop it |
-| `anyOf`/`oneOf` members                   | union; a member in several versions (same `$ref`, same `type`) is merged |
+| `anyOf`/`oneOf` members                   | union; a `$ref` in several versions is merged, an identical member kept once |
 | a schema whose shape changes (`$ref` target, `allOf`/`anyOf`/`oneOf`, inline) | `anyOf` of every shape, so each is typed; a null wrapper (`anyOf: [{$ref}, {type: "null"}]`, 3.0 `nullable` + `allOf`) is looked through, so gaining or losing one is not a reshape; under `not`/`if`… the newest shape wins |
 | everything else (descriptions, formats …) | newest wins                                               |
 

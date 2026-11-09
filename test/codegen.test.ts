@@ -158,8 +158,31 @@ describe("tolerant merge", () => {
 
     it("keeping every member of a union, merging those in both", () => {
       expect(merge({ anyOf: [A, B] }, { anyOf: [A, { type: "string" }] })).toEqual({ anyOf: [A, B, { type: "string" }] });
-      const e = (...v: string[]) => ({ enum: v, type: "string" });
-      expect(merge({ oneOf: [A, e("x")] }, { oneOf: [{ type: "string", enum: ["y"] }, A] })).toEqual({ oneOf: [A, e("x", "y")] });
+      const x = { type: "string", enum: ["x"] };
+      // identical up to key order: kept once
+      expect(merge({ oneOf: [A, x] }, { oneOf: [{ enum: ["x"], type: "string" }, A] })).toEqual({ oneOf: [A, x] });
+    });
+
+    it("leaving a union that no minor changed as it is", () => {
+      const consts = {
+        oneOf: [
+          { const: "a", title: "A" },
+          { const: "b", title: "B" },
+        ],
+      };
+      const pet = (kind: string, field: string) => ({
+        type: "object",
+        required: ["kind", field],
+        properties: { kind: { enum: [kind] }, [field]: { type: "string" } },
+      });
+      const tagged = { oneOf: [pet("cat", "meows"), pet("dog", "barks")], discriminator: { propertyName: "kind" } };
+      for (const s of [consts, tagged]) expect(chain("3.1.0", s, s, s)).toEqual(s);
+    });
+
+    it("keeping `x-extensible-enum` and `default` on the shape they belong to", () => {
+      const open = { type: "string", "x-extensible-enum": ["a", "b"], default: "a", description: "d" };
+      const { description, ...shape } = open;
+      expect(merge(open, A)).toEqual({ description, anyOf: [shape, A] });
     });
 
     it("with the newest annotations, wherever the null wrapper was", () => {
