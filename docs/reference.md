@@ -77,6 +77,8 @@ const report = await build(loadConfig("openapi-versions.config.json"), { checkOn
 | `required` boolean on a parameter or body | AND                                                       |
 | parameter present in only some versions   | never required (path params stay required)                |
 | `enum`, primitive arrays                  | union of values, order kept                               |
+| a schema that accepts null                | still accepts null if any version did (`nullable: true`, `"null"` in `type`, a null `anyOf`/`oneOf` member); oasdiff lets a response drop it |
+| a `$ref` in one version, not the other    | newest wins as a whole                                    |
 | everything else (descriptions, formats …) | newest wins                                               |
 
 The inputs must be non-breaking relative to each other (step 2); otherwise the union can describe a shape no server ever had.

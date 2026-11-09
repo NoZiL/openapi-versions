@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { checkChain, probeOasdiff } from "../codegen/breaking";
 import { BreakingChangeError, build } from "../codegen/build";
 import { validateConfig } from "../codegen/config";
-import { mergeAll } from "../codegen/merge";
+import { mergeAll, mergeTolerant } from "../codegen/merge";
 import { computeSince } from "../codegen/since";
 
 const load = (v: string, dir = "test/fixtures/specs") => ({ version: v, doc: JSON.parse(fs.readFileSync(`${dir}/${v}.json`, "utf8")) });
@@ -27,6 +27,83 @@ describe("tolerant merge", () => {
   it("unions paths and makes params added later optional", () => {
     expect(Object.keys(merged.paths)).toEqual(["/users", "/users/{id}", "/users/{id}/archive", "/users/{id}/activity"]);
     expect(merged.paths["/users"].get.parameters).toEqual([{ name: "search", in: "query", required: false, schema: { type: "string" } }]);
+  });
+
+  // #98: 1.0.0 declares Pet.nickname, tag items and the Pet.owner reference nullable, 1.1.0 drops
+  // that; oasdiff lets a response do so, and a backend still on 1.0.0 can send null
+  const REF = { $ref: "#/components/schemas/User" };
+  describe.each([
+    ["test/fixtures/nullable-narrowing", { type: ["string", "null"] }, { anyOf: [REF, { type: "null" }] }],
+    ["test/fixtures/nullable-narrowing-3.0", { type: "string", nullable: true }, { nullable: true, allOf: [REF] }],
+  ])("keeps a field nullable if an older minor says so (%s)", (dir, nullableString, nullableRef) => {
+    const docs = ["1.0.0", "1.1.0"].map((v) => load(v, dir).doc);
+
+    it("in the merged spec, whichever order the minors come in", () => {
+      for (const pet of [mergeAll(docs), mergeAll([...docs].reverse())].map((m) => m.components.schemas.Pet)) {
+        expect(pet.properties.nickname).toEqual(nullableString);
+        expect(pet.properties.tags.items).toEqual(nullableString);
+        expect(pet.properties.owner).toEqual(nullableRef);
+        expect(pet.properties.id).toEqual({ type: "string" });
+        // a property named like a keyword is a property, not the keyword
+        expect(pet.properties.required).toEqual({ type: "boolean" });
+        expect(pet.required).toEqual(["id", "nickname", "owner", "required"]);
+      }
+    });
+
+    it.skipIf(!hasOasdiff)("which the gate lets through", () => {
+      expect(checkChain(["1.0.0", "1.1.0"].map((version) => ({ version, file: `${dir}/${version}.json` })))[0].ok).toBe(true);
+    });
+
+    it.each(["openapi-typescript", "openapi-typesafe"] as const)("in the types generated with %s", async (generator) => {
+      const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "openapi-versions-"));
+      try {
+        await build({ specsDir: dir, outDir, majors: { 1: { floor: "1.0.0" } }, gate: "off", generator }, { log: () => {} });
+        const schema = fs.readFileSync(path.join(outDir, "v1/schema.d.ts"), "utf8");
+        expect(schema).toMatch(/nickname: string \| null;/);
+        expect(schema).toMatch(/tags\?: \(string \| null\)\[\];/);
+        expect(schema).toContain(`owner: components["schemas"]["User"] | null;`);
+        expect(schema).toMatch(/required: boolean;/);
+      } finally {
+        fs.rmSync(outDir, { recursive: true, force: true });
+      }
+    });
+  });
+
+  describe("reads keywords only where they are keywords", () => {
+    const doc = (openapi: string, extra: Record<string, unknown>) => ({ openapi, ...extra });
+    const nullableOld = { type: "object", required: ["a"], properties: { a: { type: "string" }, b: { type: ["string", "null"] } } };
+    const narrowedNew = { type: "object", required: ["a", "b"], properties: { a: { type: "string" }, b: { type: "string" } } };
+    const expected = { type: "object", required: ["a"], properties: { a: { type: "string" }, b: { type: ["string", "null"] } } };
+    const json = (schema: unknown) => ({ content: { "application/json": { schema } } });
+
+    it("in a `default` response and properties named `default`, `enum`, `example`", () => {
+      const at = (schema: unknown) =>
+        doc("3.1.0", {
+          paths: { "/p": { get: { responses: { default: json(schema) } } } },
+          components: { schemas: { S: { type: "object", properties: { default: schema, enum: schema, example: schema } } } },
+        });
+      const merged = mergeTolerant(at(nullableOld), at(narrowedNew));
+      expect(merged.paths["/p"].get.responses.default.content["application/json"].schema).toEqual(expected);
+      for (const name of ["default", "enum", "example"]) expect(merged.components.schemas.S.properties[name]).toEqual(expected);
+    });
+
+    it("keeps a header or a component named `required`", () => {
+      const at = () => doc("3.1.0", { components: { headers: { required: { schema: { type: "string" } } } } });
+      expect(mergeTolerant(at(), at()).components.headers.required).toEqual({ schema: { type: "string" } });
+    });
+
+    it("does not widen under `not`, where accepting null would reject it", () => {
+      const at = (not: unknown) => doc("3.1.0", { components: { schemas: { Q: { not } } } });
+      expect(mergeTolerant(at({ type: ["integer", "null"] }), at({ type: "integer" })).components.schemas.Q).toEqual({
+        not: { type: "integer" },
+      });
+    });
+
+    it("lets an explicit type decide over a null enum member", () => {
+      const at = (s: unknown) => doc("3.1.0", { components: { schemas: { E: s } } });
+      const merged = mergeTolerant(at({ type: ["string", "null"], enum: ["a", null] }), at({ type: "string", enum: ["a", "b"] }));
+      expect(merged.components.schemas.E).toEqual({ type: ["string", "null"], enum: ["a", null, "b"] });
+    });
   });
 });
 

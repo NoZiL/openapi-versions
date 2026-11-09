@@ -1,0 +1,80 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "nullable narrowing",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/pets/{id}": {
+      "get": {
+        "operationId": "getPet",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ok",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pet"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "User": {
+        "type": "object",
+        "required": ["name"],
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "Pet": {
+        "type": "object",
+        "required": ["id", "nickname", "owner", "required"],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "nickname": {
+            "type": ["string", "null"]
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": ["string", "null"]
+            }
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/User"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "required": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  }
+}
