@@ -3,16 +3,9 @@
 # report what remains. Never --unsafe. Files Biome ignores (see biome.json) are skipped.
 project=${CLAUDE_PROJECT_DIR:-$(pwd)}
 input=$(cat)
-file=$(printf '%s' "$input" | jq -r '.tool_input.file_path // empty')
+. "$(dirname "$0")/repo.sh"
+file=$(hook_file "$input")
 [ -n "$file" ] || exit 0
-# A relative file_path is relative to the session's cwd (hook input), not to this
-# process's (mise starts the task in the directory of mise.toml); with no or an
-# empty cwd, fall back to the process cwd.
-case "$file" in
-  /*) ;;
-  *) cwd=$(printf '%s' "$input" | jq -r '.cwd // empty')
-     file="${cwd:-.}/$file" ;;
-esac
 [ -f "$file" ] || exit 0
 # Run Biome from the top level of the worktree holding the file, which may not be
 # the session's (Orca worktrees): Biome panics on a path outside its root.
@@ -24,7 +17,6 @@ root=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null) && [ -n "$root" ] ||
 # name starting with - a path for any tool (Biome 2.6 already accepts one).
 prefix=$(git -C "$dir" rev-parse --show-prefix 2>/dev/null) || exit 0
 rel="./$prefix$(basename "$file")"
-. "$(dirname "$0")/repo.sh"
 # A project dir outside any repository would skip every file. Say so on stderr
 # (exit 0: Claude Code shows it in the transcript view only).
 pc=$(repo_common "$project") && [ -n "$pc" ] || {
