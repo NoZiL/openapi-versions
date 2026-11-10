@@ -1,7 +1,9 @@
 #!/bin/sh
 # Stop: block once if a policy file changed without an ADR, or if the tree is
 # red (lint, typecheck, test), skipping the checks if their inputs are unchanged
-# since the last green run (ADRs 0013, 0015). oasdiff and build stay CI-only (ADR 0004).
+# since the last green run (ADRs 0013, 0015). The ADR block is raised once per
+# session and policy content, not on every turn (ADR 0024). oasdiff and build
+# stay CI-only (ADR 0004).
 # stop_hook_active is true on the retry after a block, so we never loop.
 input=$(cat) # read stdin first, even when exiting early
 # jq parses the input: without it every check below would be skipped unnoticed.
@@ -37,10 +39,30 @@ if printf '%s\n' "$changed" | grep -qx 'package.json' \
   policy="${policy:+$policy
 }package.json (dependencies)"
 fi
+# Raised once per session and policy content: the agent's answer to the block is
+# the acknowledgement, and it lives in that session's conversation. The keys of
+# blocks already answered are kept in ack_file.
+# key = session_id + each policy path with its blob hash (or the dependency sections).
+policy_state() {
+  printf '%s' "$input" | jq -r '.session_id // ""' 2>/dev/null
+  printf '%s\n' "$policy" | while IFS= read -r p; do
+    case $p in
+      "package.json (dependencies)") printf '%s\n' "$p"; deps_of 2>/dev/null < package.json || echo deleted ;;
+      *) printf '%s ' "$p"; git hash-object -- "$p" 2>/dev/null || echo deleted ;;
+    esac
+  done
+}
+gitdir=$(git rev-parse --absolute-git-dir)
+ack_file="$gitdir/claude-stop-adr"
+adr_key="" adr_reason="" other_reason=""
 if [ -n "$policy" ] && ! printf '%s\n' "$changed" | grep -q '^docs/adr/'; then
-  reasons="Policy files changed with no ADR under docs/adr/:
+  adr_key=$(policy_state | shasum | cut -d' ' -f1)
+  if ! grep -qx "$adr_key" "$ack_file" 2>/dev/null; then
+    adr_reason="Policy files changed with no ADR under docs/adr/:
 $policy
-Read docs/adr/README.md; add an ADR or say why not."
+Read docs/adr/README.md; add an ADR or say why not. This is asked once per policy change."
+    reasons=$adr_reason
+  fi
 fi
 
 # Skip the slow checks when nothing they read changed since the last green run.
@@ -68,7 +90,7 @@ key() { # <inputs hash>: empty if the inputs hash is empty
   g=$(hash_files playground/generated test/fixtures/generated) || return 0
   printf '%s\n%s' "$1" "$g" | shasum | cut -d' ' -f1
 }
-cache="$(git rev-parse --absolute-git-dir)/claude-stop-check"
+cache="$gitdir/claude-stop-check"
 before=$(inputs)
 k=$(key "$before")
 # Neither tool may edit the tree (ADRs 0014, 0022). mise installs missing tools
@@ -83,6 +105,7 @@ if [ -z "$k" ] || [ "$(cat "$cache" 2>/dev/null)" != "$k" ]; then
   # running them. Global tools are left out: the checks do not use them.
   missing=$(mise ls --no-global --missing 2>/dev/null | awk '{printf "%s%s@%s", (NR > 1 ? ", " : ""), $1, $2}')
   if [ -n "$missing" ]; then
+    other_reason=1
     reasons="${reasons:+$reasons
 
 }Tools from mise.toml not installed: $missing. Run mise install (it updates mise.lock for a new version); the checks did not run."
@@ -101,6 +124,7 @@ if [ -z "$k" ] || [ "$(cat "$cache" 2>/dev/null)" != "$k" ]; then
     printf '%s' "$out" | grep -q ERR_PNPM_VERIFY_DEPS_BEFORE_RUN \
       && hint="Dependencies not installed or out of date (no node_modules, or package.json, pnpm-lock.yaml or pnpm-workspace.yaml changed since the last install): run pnpm install.
 "
+    other_reason=1
     reasons="${reasons:+$reasons
 
 }${hint}mise run check:fast failed. Fix it before finishing:
@@ -109,4 +133,12 @@ $(printf '%s\n' "$out" | tail -40)"
 fi
 
 [ -n "$reasons" ] || exit 0
+# Record the ADR block as answered only when it is the sole reason: blocked
+# together with red checks, the retry may fix those and skip the question, so
+# it is asked again next stop. Keep the last 50 keys; write via temp file + mv.
+if [ -n "$adr_reason" ] && [ -z "$other_reason" ]; then
+  { t=$(mktemp "$ack_file.XXXXXX") \
+    && { { tail -n 49 "$ack_file" 2>/dev/null; echo "$adr_key"; } > "$t" && mv -f "$t" "$ack_file" || rm -f "$t"; }
+  } 2>/dev/null || :
+fi
 jq -n --arg r "$reasons" '{decision:"block",reason:$r}'
