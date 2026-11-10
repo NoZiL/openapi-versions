@@ -17,11 +17,6 @@ repo_common() {
 # process's (mise starts the task in the directory of mise.toml); with no or an
 # empty cwd, fall back to the process cwd.
 hook_file() {
-  f=$(printf '%s' "$1" | jq -r '.tool_input.file_path // empty')
-  case "$f" in
-    ''|/*) ;;
-    *) c=$(printf '%s' "$1" | jq -r '.cwd // empty')
-       f="${c:-.}/$f" ;;
-  esac
-  printf '%s' "$f"
+  printf '%s' "$1" | jq -r '(.cwd // "") as $c | .tool_input.file_path // empty | select(. != "")
+    | if startswith("/") then . else (if $c == "" then "." else $c end) + "/" + . end'
 }
