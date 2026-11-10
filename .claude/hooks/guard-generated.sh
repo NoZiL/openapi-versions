@@ -4,16 +4,9 @@
 # this repository (Orca worktrees). Exit 2 + stderr blocks the call and tells the model why.
 project=${CLAUDE_PROJECT_DIR:-$(pwd)}
 input=$(cat)
-file=$(printf '%s' "$input" | jq -r '.tool_input.file_path // empty')
+. "$(dirname "$0")/repo.sh"
+file=$(hook_file "$input")
 [ -n "$file" ] || exit 0
-# A relative file_path is relative to the session's cwd (hook input), not to this
-# process's (mise starts the task in the directory of mise.toml); with no or an
-# empty cwd, fall back to the process cwd.
-case "$file" in
-  /*) ;;
-  *) cwd=$(printf '%s' "$input" | jq -r '.cwd // empty')
-     file="${cwd:-.}/$file" ;;
-esac
 # One node start prints two lines: the absolute path, with (..) normalized so
 # "src/../patches/x" can't slip through and resolved through symlinks when it exists
 # (a link to a patch is an edit to the patch); then that path relative to the project dir.
@@ -49,7 +42,6 @@ while [ ! -d "$dir" ]; do
   rest="$(basename "$dir")/$rest"
   dir=$(dirname "$dir")
 done
-. "$(dirname "$0")/repo.sh"
 c=$(repo_common "$dir") && [ -n "$c" ] && pc=$(repo_common "$project") && [ "$c" = "$pc" ] || exit 0
 prefix=$(git -C "$dir" rev-parse --show-prefix 2>/dev/null) || exit 0
 check "$prefix$rest"
