@@ -10,6 +10,7 @@ Tooling: `mise install` (node, pnpm, oasdiff, actionlint from `mise.toml`), then
 - `pnpm codegen` regenerate `playground/generated` and `test/fixtures/generated` (both gitignored) from their `specs/` + `openapi-versions.config.json`
 - `pnpm check:breaking` only the oasdiff gate
 - `pnpm typecheck`, `pnpm test`, `pnpm build` (bundle CLI/API to `dist/`), `pnpm playground` (app), `pnpm playground:api` (CLI demo)
+- RTK users (the per-user `rtk hook claude` command rewriter): RTK turns `pnpm lint`, `pnpm biome …` and `pnpm exec biome …` into `rtk lint …`, its ESLint filter, which fails with `ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL` and changes nothing. Run them as `rtk proxy pnpm lint` / `rtk proxy pnpm exec biome …` (`pnpm format` is not rewritten). Plain `git` works in agent worktrees.
 
 ## Rules (do not violate)
 
