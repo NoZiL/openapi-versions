@@ -14,7 +14,7 @@ run = "pnpm install"
 
 [tasks.check]
 description = "Everything CI runs"
-depends = ["lint", "lint:workflows", "typecheck", "test", "check:breaking", "build"]
+depends = ["lint", "lint:workflows", "typecheck", "test", "test:hooks", "check:breaking", "build"]
 
 [tasks.lint]
 run = "pnpm lint"
@@ -27,7 +27,7 @@ run = "actionlint"
 # outside this run never sees a missing file either (ADR 0021, #79).
 # `pnpm typecheck:tsc` and `pnpm test:run` run no codegen: on their own they need the
 # generated dirs to exist already. stop-check.test.sh asserts these depends and run lines
-# (by hand until the hook tests run in CI, #72).
+# (in `test:hooks`, so in CI too).
 [tasks."codegen:playground"]
 run = "pnpm codegen:playground"
 [tasks."codegen:test"]
@@ -47,6 +47,10 @@ run = "pnpm test:run"
 run = "pnpm check:breaking"
 [tasks.build]
 run = "pnpm build"
+
+[tasks."test:hooks"]
+description = "Tests for the Claude Code hooks (.claude/hooks/*.test.sh); needs git, jq, shasum, node, mise"
+run = 'rc=0; for t in .claude/hooks/*.test.sh; do echo "== $t"; sh "$t" || rc=1; done; exit $rc'
 
 [tasks."hook:guard"]
 description = "Claude Code PreToolUse: deny edits to generated dirs and patches/ (stdin: hook JSON)"
