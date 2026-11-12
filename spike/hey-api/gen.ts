@@ -11,7 +11,7 @@
  *        meta.ts   our meta + `opIds` (Hey API operation id -> op key), what gate() reads
  *        core.ts   re-exports of the floor operations only
  *        gated.ts  re-exports of the operations added after the floor
- *        client.ts what apps import: runtime bound to this major + `api` (core) and `gated` namespaces
+ *        client.ts what apps import: runtime bound to this major + `$api` (core) and `$gated` namespaces
  *
  * Run `pnpm codegen` first, then `pnpm exec tsx spike/hey-api/gen.ts`.
  */
@@ -109,9 +109,9 @@ for (const { generated, out } of targets) {
       `const runtime = createHeyApiAware<GatedOp, GatedField>(meta, client);\n\n` +
       `export const { ApiVersionProvider, useApi, useSupports, useHasField, useSunset, Feature, createApi } = runtime;\n` +
       `/** floor operations: sdk functions, xxxOptions(), xxxMutation() */\n` +
-      `export * as api from "./core";\n` +
-      `/** newer operations: useQuery(gate(gated.xxxOptions(...))), gated.xxxMutation() inside <Feature> */\n` +
-      `export * as gated from "./gated";\n` +
+      `export * as $api from "./core";\n` +
+      `/** newer operations: useQuery(gate($gated.xxxOptions(...))), $gated.xxxMutation() inside <Feature> */\n` +
+      `export * as $gated from "./gated";\n` +
       `export type * from "./sdk/types.gen";\n` +
       `export type { GatedOp, GatedField };\n` +
       `export type Api = ReturnType<typeof useApi>;\n`,

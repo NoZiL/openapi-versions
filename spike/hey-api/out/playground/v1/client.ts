@@ -7,9 +7,9 @@ const runtime = createHeyApiAware<GatedOp, GatedField>(meta, client);
 
 export const { ApiVersionProvider, useApi, useSupports, useHasField, useSunset, Feature, createApi } = runtime;
 /** floor operations: sdk functions, xxxOptions(), xxxMutation() */
-export * as api from "./core";
-/** newer operations: useQuery(gate(gated.xxxOptions(...))), gated.xxxMutation() inside <Feature> */
-export * as gated from "./gated";
+export * as $api from "./core";
+/** newer operations: useQuery(gate($gated.xxxOptions(...))), $gated.xxxMutation() inside <Feature> */
+export * as $gated from "./gated";
 export type * from "./sdk/types.gen";
 export type { GatedOp, GatedField };
 export type Api = ReturnType<typeof useApi>;

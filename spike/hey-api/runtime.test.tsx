@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider, useMutation, useQuery } from "@tansta
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { createMockBackend } from "../../playground/api/mock-backend";
-import { ApiVersionProvider, api, createApi, Feature, gated, type User, useApi, useSunset } from "./out/test/v1/client";
+import { $api, $gated, ApiVersionProvider, createApi, Feature, type User, useApi, useSunset } from "./out/test/v1/client";
 
 function statusLabel(status: User["status"]): string {
   switch (status) {
@@ -22,9 +22,9 @@ function statusLabel(status: User["status"]): string {
 
 function UserCard({ id }: { id: string }) {
   const { gate } = useApi();
-  const user = useQuery(api.getUserOptions({ path: { id } }));
-  const activity = useQuery(gate(gated.getUserActivityOptions({ path: { id } })));
-  const archive = useMutation(gated.archiveUserMutation());
+  const user = useQuery($api.getUserOptions({ path: { id } }));
+  const activity = useQuery(gate($gated.getUserActivityOptions({ path: { id } })));
+  const archive = useMutation($gated.archiveUserMutation());
   const sunset = useSunset();
   if (!user.data) return <p>loading user</p>;
   return (
@@ -50,7 +50,7 @@ function setup(version: string, id = "1", opts: { sunset?: string } = {}) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={qc}>
-      <ApiVersionProvider baseUrl="http://api.test" fetch={backend.fetch} loading={<p>checking API</p>}>
+      <ApiVersionProvider baseUrl="http://$api.test" fetch={backend.fetch} loading={<p>checking API</p>}>
         <UserCard id={id} />
       </ApiVersionProvider>
     </QueryClientProvider>,
@@ -99,11 +99,11 @@ describe("Hey API output against different backends", () => {
 
   it("createApi without React: gate() on query keys built by Hey API", async () => {
     const backend = createMockBackend("1.5.0");
-    const { compat, gate } = await createApi({ baseUrl: "http://api.test", fetch: backend.fetch });
+    const { compat, gate } = await createApi({ baseUrl: "http://$api.test", fetch: backend.fetch });
     expect(compat.version).toBe("1.5.0");
-    expect(gate(gated.getUserActivityOptions({ path: { id: "1" } })).queryFn).toBeTypeOf("symbol"); // skipToken
-    expect(gate(api.getUserOptions({ path: { id: "1" } })).queryFn).toBeTypeOf("function");
-    const { data } = await api.getUser({ path: { id: "1" } });
+    expect(gate($gated.getUserActivityOptions({ path: { id: "1" } })).queryFn).toBeTypeOf("symbol"); // skipToken
+    expect(gate($api.getUserOptions({ path: { id: "1" } })).queryFn).toBeTypeOf("function");
+    const { data } = await $api.getUser({ path: { id: "1" } });
     expect(data?.name).toBe("Ada Lovelace");
   });
 });

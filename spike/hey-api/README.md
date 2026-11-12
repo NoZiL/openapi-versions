@@ -21,12 +21,12 @@ pnpm exec vitest run spike                # spike/hey-api/runtime.test.tsx
 How a component calls each kind of operation:
 
 ```tsx
-import { api, gated, Feature, useApi } from "./generated/v1/client";
+import { $api, $gated, Feature, useApi } from "./generated/v1/client";
 
 const { gate } = useApi();
-const user = useQuery(api.getUserOptions({ path: { id } }));                         // floor op
-const activity = useQuery(gate(gated.getUserActivityOptions({ path: { id } })));     // gated query
-const archive = useMutation(gated.archiveUserMutation());                             // gated mutation...
+const user = useQuery($api.getUserOptions({ path: { id } }));                         // floor op
+const activity = useQuery(gate($gated.getUserActivityOptions({ path: { id } })));     // gated query
+const archive = useMutation($gated.archiveUserMutation());                             // gated mutation...
 <Feature requires="post /users/{id}/archive">                                         // ...rendered inside <Feature>
   <button onClick={() => archive.mutate({ path: { id } })}>Archive</button>
 </Feature>
