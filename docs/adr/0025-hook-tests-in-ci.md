@@ -2,6 +2,7 @@
 
 - Status: accepted
 - Date: 2026-11-10
+- Amends: [0015](0015-stop-hook-cache-key-covers-check-inputs.md) (the hook tests run by hand, not in CI)
 
 ## Context
 
@@ -11,7 +12,7 @@
 
 A mise task, `test:hooks`, runs every `.claude/hooks/*.test.sh` and fails if any fails (it runs them all first, so one failure doesn't hide another). `check` depends on it, and the CI job runs `mise run test:hooks` after `pnpm test`. `check:fast`, which the Stop hook runs, does not: the hooks change rarely, and the Stop hook testing itself on every turn adds time for no gain.
 
-The scripts need `git`, `jq`, `shasum`, `node` and `mise`, which the CI runner has (`jq`, `node` and `mise` through `jdx/mise-action`). They were checked on Ubuntu 24.04 before this change: `sort -z`, `xargs` and `shasum` behave as on macOS.
+The scripts need `git`, `jq`, `shasum`, `node` and `mise`, which the CI runner has (`jq`, `node` and `mise` through `jdx/mise-action`). They were checked on Ubuntu 24.04 (what `ubuntu-latest` was then) before this change: `sort -z`, `xargs` and `shasum` behave as on macOS.
 
 ## Consequences
 
