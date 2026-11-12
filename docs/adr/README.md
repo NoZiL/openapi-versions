@@ -38,7 +38,7 @@ Small fixes, dependency bumps and refactors need none. Take the next free number
 | [0012](0012-typescript-range-follows-openapi-typescript.md) | `typescript` range follows `openapi-typescript`'s peer range; no peer overrides | superseded by 0017 |
 | [0013](0013-stop-hook-adr-and-check.md) | Claude Code Stop hook blocks once on missing ADR or red lint/typecheck/test | accepted, amended by 0014, 0015, 0024 |
 | [0014](0014-stop-hook-never-rewrites-lockfile.md) | Stop hook fails instead of re-syncing the lockfile; amends 0013 | accepted, amended by 0020, 0022 |
-| [0015](0015-stop-hook-cache-key-covers-check-inputs.md) | Stop hook cache key covers installed deps and generated output; cached only if the run left the inputs unchanged; amends 0013 | accepted, amended by 0020 |
+| [0015](0015-stop-hook-cache-key-covers-check-inputs.md) | Stop hook cache key covers installed deps and generated output; cached only if the run left the inputs unchanged; amends 0013 | accepted, amended by 0020, 0025 |
 | [0016](0016-build-with-tsdown.md) | Build with tsdown; `.d.ts` from TypeScript 5, no dev-only TS 7 yet | accepted, amended by 0018 |
 | [0017](0017-support-openapi-typescript-and-openapi-typesafe.md) | Support openapi-typescript and openapi-typesafe side by side; TS 5.4 to 7 on the typesafe path; amends 0005, supersedes 0012 | accepted, amended by 0019 |
 | [0018](0018-isolated-declarations-oxc-dts.md) | `.d.ts` from Oxc with `isolatedDeclarations` on `src/` + `codegen/`; explicit public return types; amends 0016 | accepted |
@@ -48,3 +48,4 @@ Small fixes, dependency bumps and refactors need none. Take the next free number
 | [0022](0022-stop-hook-no-mise-auto-install.md) | Claude Code hooks turn off mise's tool auto-install (`MISE_AUTO_INSTALL=false`) so `mise.lock` is never rewritten; the Stop hook blocks on missing project tools before the checks; lockfile guards stay in the hooks; amends 0014 | accepted |
 | [0023](0023-codegen-write-lock.md) | Codegen holds a lock file in `outDir` while writing and stages every changed file before renaming any; amends 0021 | accepted |
 | [0024](0024-stop-hook-adr-block-once-per-policy-change.md) | Stop hook raises the missing-ADR block once per session and policy content, not every turn; amends 0013 | accepted |
+| [0025](0025-hook-tests-in-ci.md) | CI and `mise run check` run the Claude Code hook tests (`test:hooks`); `check:fast` does not; amends 0015 | accepted |

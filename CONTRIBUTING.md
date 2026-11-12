@@ -9,7 +9,7 @@ mise install
 pnpm install
 ```
 
-`mise run check` runs everything CI runs (lint, workflow lint, typecheck, test, breaking-change gate, build).
+`mise run check` runs everything CI runs (lint, workflow lint, typecheck, test, hook tests, breaking-change gate, build). The hook tests need `git`, `jq`, `shasum`, `node` and `mise`.
 
 ## Before you start
 
