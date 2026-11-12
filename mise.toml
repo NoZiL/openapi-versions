@@ -13,7 +13,7 @@ depends = ["lint", "typecheck", "test"]
 run = "pnpm install"
 
 [tasks.check]
-description = "Everything CI runs"
+description = "Everything CI runs; CI runs this task, so this is the only list (ADR 0026)"
 depends = ["lint", "lint:workflows", "typecheck", "test", "test:hooks", "check:breaking", "build"]
 
 [tasks.lint]

@@ -9,7 +9,7 @@ mise install
 pnpm install
 ```
 
-`mise run check` runs everything CI runs (lint, workflow lint, typecheck, test, hook tests, breaking-change gate, build). The hook tests need `git`, `jq`, `shasum`, `node` and `mise`.
+`mise run check` is exactly what CI runs: the CI job installs dependencies and then runs this task. Its `depends` line in `mise.toml` is the list of checks; add a new check there. Besides the tools mise installs, it needs `git` and `shasum`.
 
 ## Before you start
 
