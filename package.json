@@ -8,7 +8,7 @@
     "codegen": "pnpm codegen:playground && pnpm codegen:test",
     "check:breaking": "tsx codegen/cli.ts --check-only --config playground/openapi-versions.config.json",
     "typecheck": "pnpm codegen && pnpm typecheck:tsc",
-    "typecheck:tsc": "tsc --noEmit && tsc -p tsconfig.build.json --noEmit",
+    "typecheck:tsc": "tsc --noEmit && tsc -p tsconfig.build.json --noEmit && tsc -p tsconfig.typesafe.json --noEmit",
     "test": "pnpm codegen:test && pnpm test:run",
     "test:run": "vitest run",
     "playground": "pnpm codegen:playground && vite --config playground/app/vite.config.ts",

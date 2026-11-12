@@ -1,8 +1,8 @@
 import { defineConfig } from "vitest/config";
 import { TYPESAFE_STACK } from "./codegen/stacks.ts";
 
-/** Test files that run the runtime (`src/`) and so run once per stack (ADR 0017). */
-const RUNTIME_TESTS = ["test/compat.test.ts", "test/loader.test.ts", "test/majors.test.tsx", "test/react.test.tsx", "test/stack.test.ts"];
+/** Tests that do not run the runtime (`src/`): run once. Every other test runs once per stack (ADR 0017). */
+const CODEGEN_TESTS = ["test/codegen.test.ts", "test/codegen-lock.test.ts", "test/generator.test.ts"];
 
 export default defineConfig({
   test: {
@@ -17,7 +17,12 @@ export default defineConfig({
         // the runtime against the openapi-typesafe stack, as `openapi-versions/typesafe` is built
         extends: true,
         resolve: { alias: Object.entries(TYPESAFE_STACK).map(([find, replacement]) => ({ find, replacement })) },
-        test: { name: "openapi-typesafe", include: RUNTIME_TESTS, provide: { stack: "openapi-typesafe" } },
+        test: {
+          name: "openapi-typesafe",
+          include: ["test/**/*.test.{ts,tsx}"],
+          exclude: CODEGEN_TESTS,
+          provide: { stack: "openapi-typesafe" },
+        },
       },
     ],
   },

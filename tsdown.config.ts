@@ -41,7 +41,7 @@ export default defineConfig([
     entry: { index: "src/index.ts", core: "src/core/index.ts", codegen: "codegen/index.ts", cli: "codegen/cli.ts" },
     outDir: "dist",
     dts: { entry: ["src/index.ts", "src/core/index.ts", "codegen/index.ts"], generator: "oxc" },
-    // removes dist/typesafe too; the two builds run in order, this one first
+    // tsdown cleans every config's outDir once, before the builds (which run in parallel), so this also empties dist/typesafe
     clean: true,
     hooks: onlyStack(OPENAPI_TYPESAFE_STACK),
   },

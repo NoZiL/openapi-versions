@@ -1,6 +1,8 @@
 /**
  * The runtime tests run once per generator stack (vitest projects, ADR 0017). This checks that
- * each project really runs the runtime on its own stack, so the second run is not a silent copy.
+ * each project resolves the stack packages to its own stack, so the second run is not a silent
+ * copy. It checks this file's imports: `src/` is never externalized, so its imports go through
+ * the same aliases.
  */
 import * as fetchClient from "openapi-fetch";
 import * as queryClient from "openapi-react-query";
