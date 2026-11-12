@@ -11,5 +11,5 @@
     "noEmit": true,
     "types": ["node", "vite/client"]
   },
-  "include": ["codegen", "src", "test", "playground"]
+  "include": ["codegen", "src", "test", "playground", "spike"]
 }

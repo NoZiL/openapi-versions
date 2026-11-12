@@ -6,6 +6,7 @@
       "**",
       "!playground/generated",
       "!test/fixtures/generated",
+      "!spike/hey-api/out",
       "!test/fixtures/specs",
       "!test/fixtures/broken",
       "!test/fixtures/next-major",
