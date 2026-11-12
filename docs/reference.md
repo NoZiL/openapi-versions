@@ -12,7 +12,7 @@ File: `openapi-versions.config.json`. JSON Schema: [`openapi-versions.schema.jso
 | `majors.<n>.floor` | plain semver                                  | Oldest supported minor of major `n`. Must be in major `n` and must have a spec file.                                                                                           |
 | `gate`             | `"auto"` \| `"required"` \| `"off"`, optional | Breaking-change gate. `auto` (default): run oasdiff if installed, otherwise warn and skip. `required`: fail when oasdiff is missing or older than 1.34.0. `off`: never run it. |
 | `generator`        | `"openapi-typescript"` \| `"openapi-typesafe"`, optional | Generator that writes `schema.d.ts`. Default: the one installed; openapi-typescript if both are. openapi-typesafe supports TypeScript 5.4 to 7, needs no helpers patch and needs Node 22.12 or newer ([ADR 0017](adr/0017-support-openapi-typescript-and-openapi-typesafe.md)). |
-| `runtimeImport`    | string, optional                              | Module the generated `client.ts` imports the runtime from. Default `openapi-versions`. A relative path when developing the runtime in the same repo.                           |
+| `runtimeImport`    | string, optional                              | Module the generated `client.ts` imports the runtime from. Default: the entry built for the generator, `openapi-versions` (openapi-typescript) or `openapi-versions/typesafe` (openapi-typesafe). A relative path when developing the runtime in the same repo. |
 
 ## CLI
 
@@ -34,6 +34,8 @@ Exit code 1 on: invalid config, no generator installed (or the configured one mi
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
 | `openapi-versions`             | Runtime: `createVersionAware(meta)` (core + React), plus the core exports                                                      |
 | `openapi-versions/core`        | Framework-free runtime: `resolveCompat`, `createApi`, `createApiClient`, `fetchBackendVersion`, `createVersionAwareCore(meta)` |
+| `openapi-versions/typesafe`    | Same as `openapi-versions`, built against the openapi-typesafe stack (`openapi-typesafe-fetch`, `openapi-typesafe-react-query`). The generated `client.ts` imports it when the generator is openapi-typesafe |
+| `openapi-versions/typesafe/core` | Same as `openapi-versions/core`, built against the openapi-typesafe stack                                                  |
 | `openapi-versions/codegen`     | Programmatic codegen API                                                                                                       |
 | `openapi-versions/schema.json` | JSON Schema of the config                                                                                                      |
 | `npx openapi-versions`         | The CLI                                                                                                                        |
@@ -104,7 +106,7 @@ Codegen generates everything first, then replaces each file atomically (temp fil
 
 ## Runtime API
 
-Exported from the generated `client.ts` (bound to your types) and, unbound, from `openapi-versions` / `openapi-versions/core`:
+Exported from the generated `client.ts` (bound to your types) and, unbound, from `openapi-versions` / `openapi-versions/core` (or their `openapi-versions/typesafe` counterparts):
 
 | Symbol                                                                                    | Meaning                                                                                                                                                                                                          |
 | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

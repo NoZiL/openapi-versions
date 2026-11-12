@@ -14,7 +14,7 @@ export interface Config {
   specsDir: string;
   outDir: string;
   majors: Record<string, { floor: string }>;
-  /** Module the generated client.ts imports the runtime from. Default: the package name. */
+  /** Module the generated client.ts imports the runtime from. Default: the runtime entry built for the generator (`DEFAULT_RUNTIME_IMPORT`). */
   runtimeImport?: string;
   /** Breaking-change gate. Default "auto". */
   gate?: GateMode;
@@ -22,7 +22,11 @@ export interface Config {
   generator?: GeneratorName;
 }
 
-export const DEFAULT_RUNTIME_IMPORT = "openapi-versions";
+/** The runtime entry built against each generator's stack (ADR 0017): what client.ts imports unless `runtimeImport` is set. */
+export const DEFAULT_RUNTIME_IMPORT: Readonly<Record<GeneratorName, string>> = {
+  "openapi-typescript": "openapi-versions",
+  "openapi-typesafe": "openapi-versions/typesafe",
+};
 
 export function validateConfig(raw: unknown, source = "config"): Config {
   const fail = (msg: string): never => {

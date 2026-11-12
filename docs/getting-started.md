@@ -62,7 +62,7 @@ Codegen writes `<outDir>/v<major>/client.ts`: the runtime already bound to this 
 import { ApiVersionProvider, useApi, Feature, createApi, type Paths } from "./api/v1/client";
 ```
 
-`runtimeImport` in the config sets what `client.ts` imports the runtime from (default `openapi-versions`).
+`runtimeImport` in the config sets what `client.ts` imports the runtime from (default `openapi-versions`, or `openapi-versions/typesafe` with the openapi-typesafe generator).
 
 ## 5. Use it in React
 

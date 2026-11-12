@@ -55,8 +55,7 @@
     "runtimeImport": {
       "type": "string",
       "minLength": 1,
-      "default": "openapi-versions",
-      "description": "Module specifier the generated v<major>/client.ts imports the runtime from. Leave unset when the runtime is installed as the `openapi-versions` package; set a relative path when developing the runtime in the same repo."
+      "description": "Module specifier the generated v<major>/client.ts imports the runtime from. Leave unset to import the runtime entry built for the generator: `openapi-versions` for openapi-typescript, `openapi-versions/typesafe` for openapi-typesafe. Set a relative path when developing the runtime in the same repo."
     }
   }
 }

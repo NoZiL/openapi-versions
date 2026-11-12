@@ -1,4 +1,8 @@
-import type { HttpMethod } from "openapi-typescript-helpers";
+/**
+ * The methods a path item can have. Same union as `HttpMethod` in openapi-typescript-helpers and
+ * openapi-typesafe-helpers, written out so the runtime does not depend on either (ADR 0017).
+ */
+type HttpMethod = "get" | "put" | "post" | "delete" | "options" | "head" | "patch" | "trace";
 
 /**
  * `paths` with the gated operations removed (turned into `method?: never`, exactly how

@@ -109,7 +109,7 @@ export async function build(
     ]);
     writes.push([path.join(out, "merged.openapi.json"), `${JSON.stringify(merged, null, 2)}\n`]);
     writes.push([path.join(out, "schema.d.ts"), await generator!.generate(merged)]);
-    writes.push([path.join(out, "client.ts"), clientSource(config.runtimeImport ?? DEFAULT_RUNTIME_IMPORT)]);
+    writes.push([path.join(out, "client.ts"), clientSource(config.runtimeImport ?? DEFAULT_RUNTIME_IMPORT[generator!.name])]);
     log(
       `gen  v${major}: ${meta.specs.join(", ")} -> ${out} with ${generator!.name} (${Object.keys(gatedOps).length} gated ops, ${Object.keys(gatedFields).length} gated fields)`,
     );
