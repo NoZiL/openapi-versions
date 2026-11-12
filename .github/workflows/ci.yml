@@ -12,8 +12,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5 # node, pnpm, oasdiff and jq (hook tests) from mise.toml
+      - uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5 # every tool in mise.toml
       - run: pnpm install --frozen-lockfile
       # [tasks.check] in mise.toml is the only list of checks: add new ones there, not here (ADR 0026).
-      # --continue-on-error (before the task name, or mise passes it to the task): one failing check does not hide another.
-      - run: mise run --continue-on-error check
+      # Flags go before the task name, or mise passes them to the task. --continue-on-error: one failing
+      # check does not hide another. --output keep-order: each task's output is grouped, not interleaved.
+      - run: mise run --continue-on-error --output keep-order check

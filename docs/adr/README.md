@@ -49,4 +49,4 @@ Small fixes, dependency bumps and refactors need none. Take the next free number
 | [0023](0023-codegen-write-lock.md) | Codegen holds a lock file in `outDir` while writing and stages every changed file before renaming any; amends 0021 | accepted |
 | [0024](0024-stop-hook-adr-block-once-per-policy-change.md) | Stop hook raises the missing-ADR block once per session and policy content, not every turn; amends 0013 | accepted |
 | [0025](0025-hook-tests-in-ci.md) | CI and `mise run check` run the Claude Code hook tests (`test:hooks`); `check:fast` does not; amends 0015 | accepted, amended by 0026 |
-| [0026](0026-ci-runs-mise-check.md) | CI runs `mise run --continue-on-error check`; `[tasks.check]` is the only list of checks; amends 0025 | accepted |
+| [0026](0026-ci-runs-mise-check.md) | CI runs `mise run --continue-on-error --output keep-order check`; `[tasks.check]` is the only list of checks; amends 0025 | accepted |

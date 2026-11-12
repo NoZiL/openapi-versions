@@ -27,7 +27,7 @@ run = "actionlint"
 # outside this run never sees a missing file either (ADR 0021, #79).
 # `pnpm typecheck:tsc` and `pnpm test:run` run no codegen: on their own they need the
 # generated dirs to exist already. stop-check.test.sh asserts these depends and run lines
-# (in `test:hooks`, so in CI too).
+# (in `test:hooks`, so in CI too), and the depends of `check`.
 [tasks."codegen:playground"]
 run = "pnpm codegen:playground"
 [tasks."codegen:test"]

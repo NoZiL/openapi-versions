@@ -9,7 +9,7 @@ mise install
 pnpm install
 ```
 
-`mise run check` is exactly what CI runs: the CI job installs dependencies and then runs this task. Its `depends` line in `mise.toml` is the list of checks; add a new check there. Besides the tools mise installs, it needs `git` and `shasum`.
+`mise run check` runs the checks CI runs: the CI job runs `pnpm install --frozen-lockfile`, then `mise run --continue-on-error --output keep-order check`. Without `--continue-on-error`, the first failing check stops the others. Its `depends` line in `mise.toml` is the list of checks; add a new check there. Besides the tools mise installs, it needs `git` and `shasum`.
 
 ## Before you start
 

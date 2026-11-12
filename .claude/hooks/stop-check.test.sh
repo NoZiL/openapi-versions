@@ -28,6 +28,8 @@ if [ -z "$tasks" ]; then
   echo "FAIL mise tasks ls gave nothing (is mise installed and $root/mise.toml trusted?): $msg"
   fails=$((fails + 1))
 else
+  # check is the only list of what CI runs (ADR 0026)
+  want_task check "depends=build,check:breaking,lint,lint:workflows,test,test:hooks,typecheck run="
   want_task check:fast "depends=lint,test,typecheck run="
   want_task typecheck "depends=codegen run=pnpm typecheck:tsc"
   want_task codegen "depends=codegen:playground,codegen:test run="
