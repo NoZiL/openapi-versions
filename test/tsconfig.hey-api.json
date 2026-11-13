@@ -1,0 +1,7 @@
+{
+  // The Hey API output and runtime on the oldest and newest TypeScript we support (ADR 0027, #126):
+  // `mise run typecheck:hey-api` runs it on TS 5.5 and 7.0. The main typecheck uses the repo's TS.
+  "extends": "../tsconfig.json",
+  "compilerOptions": { "types": ["node"] },
+  "include": ["types-hey-api.check.ts", "hey-api-react.test.tsx"]
+}

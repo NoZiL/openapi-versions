@@ -14,7 +14,7 @@ run = "pnpm install"
 
 [tasks.check]
 description = "Everything CI runs; CI runs this task, so this is the only list (ADR 0026)"
-depends = ["lint", "lint:workflows", "typecheck", "test", "test:hooks", "check:breaking", "build"]
+depends = ["lint", "lint:workflows", "typecheck", "typecheck:hey-api", "test", "test:hooks", "check:breaking", "build"]
 
 [tasks.lint]
 run = "pnpm lint"
@@ -40,6 +40,15 @@ depends = ["codegen:playground", "codegen:test"]
 [tasks.typecheck]
 depends = ["codegen"]
 run = "pnpm typecheck:tsc"
+# The Hey API output and runtime on the oldest and newest TypeScript we support (ADR 0027, #126).
+# Each version is fetched by pnpm dlx; the main typecheck uses the repo's TypeScript.
+[tasks."typecheck:hey-api"]
+description = "Typecheck the Hey API fixture and runtime on TS 5.5 and 7.0"
+depends = ["codegen:test"]
+run = [
+  "pnpm --silent --package=typescript@~5.5 dlx tsc -p test/tsconfig.hey-api.json",
+  "pnpm --silent --package=typescript@~7.0 dlx tsc -p test/tsconfig.hey-api.json",
+]
 [tasks.test]
 depends = ["codegen:test"]
 run = "pnpm test:run"

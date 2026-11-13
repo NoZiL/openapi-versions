@@ -11,7 +11,5 @@
     "noEmit": true,
     "types": ["node", "vite/client"]
   },
-  "include": ["codegen", "src", "test", "playground"],
-  // the Hey API runtime entry (src/hey-api) it imports lands with #126; drop this then
-  "exclude": ["test/fixtures/generated/hey-api/v1/client.ts"]
+  "include": ["codegen", "src", "test", "playground"]
 }

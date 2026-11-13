@@ -27,6 +27,9 @@ export type Compat =
   | { status: "app-too-old"; version: string; major: number; supportedMajors: number[] }
   | { status: "invalid-version"; version: string };
 
+/** A backend this client supports. */
+export type OkCompat = Extract<Compat, { status: "ok" }>;
+
 export interface CompatOptions {
   /**
    * Treat `1.6.0-rc.1` as `1.6.0` (staging running a release candidate gets the new features).

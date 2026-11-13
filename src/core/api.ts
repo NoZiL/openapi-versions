@@ -12,10 +12,10 @@
 import { skipToken } from "@tanstack/react-query";
 import createQueryClient, { type OpenapiQueryClient } from "openapi-react-query";
 import { type ApiClient, createApiClient, fetchBackendVersion } from "./client";
-import { type Compat, type CompatOptions, type MajorMeta, resolveCompat } from "./compat";
+import { type CompatOptions, type MajorMeta, type OkCompat, resolveCompat } from "./compat";
 import type { StripOps } from "./types";
 
-export type OkCompat = Extract<Compat, { status: "ok" }>;
+export type { OkCompat } from "./compat";
 
 type QueryOptionsLike = { queryKey: readonly unknown[]; queryFn?: unknown };
 export type Gated<O extends QueryOptionsLike> = Omit<O, "queryFn"> & { queryFn: O["queryFn"] | typeof skipToken };

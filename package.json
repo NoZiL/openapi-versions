@@ -72,6 +72,10 @@
       "types": "./dist/core.d.ts",
       "import": "./dist/core.js"
     },
+    "./hey-api": {
+      "types": "./dist/hey-api.d.ts",
+      "import": "./dist/hey-api.js"
+    },
     "./codegen": {
       "types": "./dist/codegen.d.ts",
       "import": "./dist/codegen.js"
