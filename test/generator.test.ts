@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { build } from "../codegen/build";
 import { validateConfig } from "../codegen/config";
-import { type GeneratorName, isNotInstalled, loadGenerator, selectGenerator } from "../codegen/generator";
+import { type Generator, type GeneratorName, isNotInstalled, loadGenerator, selectGenerator } from "../codegen/generator";
 import { openEnums, openEnumsIr } from "../codegen/open-enums";
 
 const dirs: string[] = [];
@@ -74,7 +74,7 @@ describe("generator parity", () => {
 
 describe("generator selection", () => {
   const fake = (installed: GeneratorName[]) => async (name: GeneratorName) =>
-    installed.includes(name) ? { name, generate: async () => "" } : undefined;
+    installed.includes(name) ? ({ name, kind: name === "hey-api" ? "sdk" : "schema", generate: async () => "" } as Generator) : undefined;
   const notFound = (pkg: string) =>
     Object.assign(new Error(`Cannot find package '${pkg}' imported from /app/node_modules/openapi-versions/dist/codegen.js`), {
       code: "ERR_MODULE_NOT_FOUND",
@@ -85,24 +85,33 @@ describe("generator selection", () => {
   });
   it("uses the configured one", async () => {
     expect((await loadGenerator("openapi-typesafe")).name).toBe("openapi-typesafe");
+    expect((await loadGenerator("hey-api")).kind).toBe("sdk");
   });
   it("falls back to openapi-typesafe when it is the only one installed", async () => {
     expect((await selectGenerator(undefined, fake(["openapi-typesafe"]))).name).toBe("openapi-typesafe");
   });
-  it("explains what to install when neither is installed", async () => {
+  it("tries Hey API last, so an app with several installed keeps its stack (ADR 0027)", async () => {
+    expect((await selectGenerator(undefined, fake(["hey-api", "openapi-typesafe"]))).name).toBe("openapi-typesafe");
+    expect((await selectGenerator(undefined, fake(["hey-api"]))).name).toBe("hey-api");
+  });
+  it("explains what to install when none is installed", async () => {
     await expect(selectGenerator(undefined, fake([]))).rejects.toThrow(
-      /neither openapi-typescript nor openapi-typesafe is installed.*npm i -D/,
+      /none of openapi-typescript, openapi-typesafe, @hey-api\/openapi-ts is installed.*npm i -D/,
     );
   });
   it("fails when the configured one is not installed", async () => {
     await expect(selectGenerator("openapi-typesafe", fake(["openapi-typescript"]))).rejects.toThrow(
       /"generator" is "openapi-typesafe", but openapi-typesafe is not installed/,
     );
+    await expect(selectGenerator("hey-api", fake([]))).rejects.toThrow(
+      /"generator" is "hey-api", but @hey-api\/openapi-ts is not installed/,
+    );
   });
   it("treats only the package itself as missing, not a broken install", () => {
     expect(isNotInstalled(notFound("openapi-typescript"), "openapi-typescript")).toBe(true);
     expect(isNotInstalled(notFound("openapi-typescript-helpers"), "openapi-typescript")).toBe(false);
     expect(isNotInstalled(new Error("Cannot find package 'openapi-typescript'"), "openapi-typescript")).toBe(false);
+    expect(isNotInstalled(notFound("@hey-api/openapi-ts"), "@hey-api/openapi-ts")).toBe(true);
   });
   it("rejects an unknown generator in the config", () => {
     expect(() => validateConfig({ specsDir: "s", outDir: "o", majors: { 1: { floor: "1.0.0" } }, generator: "orval" })).toThrow(

@@ -4,7 +4,7 @@
   "description": "Multi-version OpenAPI client for the openapi-ts ecosystem: merges the minor specs of one API major, generates tolerant types with openapi-typescript, and gates features at runtime.",
   "scripts": {
     "codegen:playground": "tsx codegen/cli.ts --config playground/openapi-versions.config.json",
-    "codegen:test": "tsx codegen/cli.ts --config test/fixtures/openapi-versions.config.json",
+    "codegen:test": "tsx codegen/cli.ts --config test/fixtures/openapi-versions.config.json && tsx codegen/cli.ts --config test/fixtures/hey-api.config.json",
     "codegen": "pnpm codegen:playground && pnpm codegen:test",
     "check:breaking": "tsx codegen/cli.ts --check-only --config playground/openapi-versions.config.json",
     "typecheck": "pnpm codegen && pnpm typecheck:tsc",
@@ -31,6 +31,7 @@
     "url": "https://github.com/NoZiL/openapi-versions/issues"
   },
   "devDependencies": {
+    "@hey-api/openapi-ts": "0.99.0",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^26.6.5",
     "@types/react": "^19.3.0",
@@ -94,6 +95,7 @@
     "codegen"
   ],
   "peerDependencies": {
+    "@hey-api/openapi-ts": ">=0.99.0 <0.100.0",
     "openapi-typescript": "^7.13.0",
     "openapi-typesafe": "^1.0.0-rc.1",
     "openapi-fetch": "^0.17.0",
@@ -103,6 +105,9 @@
     "react": "^19.3.1"
   },
   "peerDependenciesMeta": {
+    "@hey-api/openapi-ts": {
+      "optional": true
+    },
     "openapi-typescript": {
       "optional": true
     },

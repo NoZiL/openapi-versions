@@ -49,14 +49,14 @@
     },
     "generator": {
       "type": "string",
-      "enum": ["openapi-typescript", "openapi-typesafe"],
-      "description": "Generator that writes schema.d.ts. Leave unset to use the one installed; if both are installed, openapi-typescript is used. openapi-typesafe supports TypeScript 5.4 to 7, needs no helpers patch and needs Node 22.12 or newer (ADR 0017)."
+      "enum": ["openapi-typescript", "openapi-typesafe", "hey-api"],
+      "description": "Generator for the types (and, for hey-api, the SDK). Leave unset to use the one installed, in this order: openapi-typescript, openapi-typesafe, hey-api. openapi-typesafe supports TypeScript 5.4 to 7, needs no helpers patch and needs Node 22.12 or newer (ADR 0017). hey-api (@hey-api/openapi-ts, experimental) writes a Hey API SDK and TanStack Query helpers, needs Node 22.18 or newer, and generates with TypeScript 6 or older (ADR 0027)."
     },
     "runtimeImport": {
       "type": "string",
       "minLength": 1,
       "default": "openapi-versions",
-      "description": "Module specifier the generated v<major>/client.ts imports the runtime from. Leave unset when the runtime is installed as the `openapi-versions` package; set a relative path when developing the runtime in the same repo."
+      "description": "Module specifier the generated v<major>/client.ts imports the runtime from. Leave unset when the runtime is installed as the `openapi-versions` package (the default is `openapi-versions/hey-api` for the hey-api generator); set a relative path when developing the runtime in the same repo."
     }
   }
 }

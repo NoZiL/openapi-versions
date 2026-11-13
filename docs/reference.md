@@ -11,8 +11,8 @@ File: `openapi-versions.config.json`. JSON Schema: [`openapi-versions.schema.jso
 | `majors`           | object                                        | Keyed by major number (`"1"`). Normally one entry per app release.                                                                                                             |
 | `majors.<n>.floor` | plain semver                                  | Oldest supported minor of major `n`. Must be in major `n` and must have a spec file.                                                                                           |
 | `gate`             | `"auto"` \| `"required"` \| `"off"`, optional | Breaking-change gate. `auto` (default): run oasdiff if installed, otherwise warn and skip. `required`: fail when oasdiff is missing or older than 1.34.0. `off`: never run it. |
-| `generator`        | `"openapi-typescript"` \| `"openapi-typesafe"`, optional | Generator that writes `schema.d.ts`. Default: the one installed; openapi-typescript if both are. openapi-typesafe supports TypeScript 5.4 to 7, needs no helpers patch and needs Node 22.12 or newer ([ADR 0017](adr/0017-support-openapi-typescript-and-openapi-typesafe.md)). |
-| `runtimeImport`    | string, optional                              | Module the generated `client.ts` imports the runtime from. Default `openapi-versions`. A relative path when developing the runtime in the same repo.                           |
+| `generator`        | `"openapi-typescript"` \| `"openapi-typesafe"` \| `"hey-api"`, optional | Generator of the types (for `hey-api`, also the SDK). Default: the first one installed, in this order: openapi-typescript, openapi-typesafe, hey-api. openapi-typesafe supports TypeScript 5.4 to 7, needs no helpers patch and needs Node 22.12 or newer ([ADR 0017](adr/0017-support-openapi-typescript-and-openapi-typesafe.md)). `hey-api` (`@hey-api/openapi-ts` 0.99.x, experimental) writes a Hey API SDK and TanStack Query helpers, needs Node 22.18 or newer, and generates with TypeScript 6 or older ([ADR 0027](adr/0027-hey-api-third-generator-stack.md)). |
+| `runtimeImport`    | string, optional                              | Module the generated `client.ts` imports the runtime from. Default `openapi-versions`, or `openapi-versions/hey-api` with the `hey-api` generator. A relative path when developing the runtime in the same repo. |
 
 ## CLI
 
@@ -38,7 +38,7 @@ Exit code 1 on: invalid config, no generator installed (or the configured one mi
 | `openapi-versions/schema.json` | JSON Schema of the config                                                                                                      |
 | `npx openapi-versions`         | The CLI                                                                                                                        |
 
-Apps rarely call `createVersionAware` themselves: the generated `client.ts` does, with the app's types. Peers: `openapi-fetch`, one generator for codegen (`openapi-typescript` or `openapi-typesafe`, both optional peers: install the one you use), and optionally `openapi-react-query`, `@tanstack/react-query`, `react`.
+Apps rarely call `createVersionAware` themselves: the generated `client.ts` does, with the app's types. Peers: `openapi-fetch`, one generator for codegen (`openapi-typescript`, `openapi-typesafe` or `@hey-api/openapi-ts`, all optional peers: install the one you use), and optionally `openapi-react-query`, `@tanstack/react-query`, `react`.
 
 In this repo: `pnpm codegen`, `pnpm check:breaking`, `pnpm build` (bundles with tsdown into `dist/`).
 
@@ -57,7 +57,7 @@ const report = await build(loadConfig("openapi-versions.config.json"), { checkOn
 | `mergeAll(docs)` / `mergeTolerant(a, b)`   | Tolerant merge of OpenAPI documents.                                                 |
 | `computeSince(docs, floor)`                | `{ ops, gatedOps, gatedFields }`                                                     |
 | `checkChain(files)` / `checkPair(a, b)`    | oasdiff gate.                                                                        |
-| `loadGenerator(name?)`                     | Configured or installed generator: `{ name, generate(doc) }` returning `schema.d.ts` text. |
+| `loadGenerator(name?)`                     | Configured or installed generator: `{ name, kind, generate(doc) }`. `kind: "schema"` returns `schema.d.ts` text; `kind: "sdk"` (Hey API) returns `{ files, operations }`. |
 | `openEnums`                                | openapi-typescript `transform` hook for `x-extensible-enum`.                         |
 
 ## Pipeline, per major
@@ -66,7 +66,7 @@ const report = await build(loadConfig("openapi-versions.config.json"), { checkOn
 2. `oasdiff breaking <prev> <next> --fail-on ERR` for each consecutive pair.
 3. Tolerant merge (rules below). `info.version` of the merged doc becomes `"<floor> - <newest>"`.
 4. Since maps.
-5. The generator (`openapi-typescript`, or `openapi-typesafe` with `irCallbacks`) on the merged doc, with the open-enum transform.
+5. The generator (`openapi-typescript`, `openapi-typesafe` with `irCallbacks`, or Hey API with `$resolvers`) on the merged doc, with open enums. For Hey API, codegen reads each operation's id and exported names back from Hey API and fails if an operation in `ops` has no id or no exported function.
 
 ## Merge rules
 
@@ -95,12 +95,14 @@ The inputs must be non-breaking relative to each other (step 2); otherwise the u
 | File                                | Content                                                                                                                                                                           |
 | ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `<outDir>/v<n>/schema.d.ts`         | Types of the merged contract from the chosen generator; extensible enums are open unions                                                                                                |
-| `<outDir>/v<n>/meta.ts`             | `meta = { major, floor, newest, specs, ops, gatedOps, gatedFields }` plus `Op`, `GatedOp`, `GatedField` types                                                                     |
+| `<outDir>/v<n>/meta.ts`             | `meta = { major, floor, newest, specs, ops, gatedOps, gatedFields }` (Hey API: plus `opIds`, operation id → op key) and `Op`, `GatedOp`, `GatedField` types                     |
 | `<outDir>/v<n>/merged.openapi.json` | the merged document (useful to inspect or diff)                                                                                                                                   |
 | `<outDir>/v<n>/client.ts`           | the runtime bound to this major: `ApiVersionProvider`, `useApi`, `useSupports`, `useHasField`, `useSunset`, `Feature`, `createApi`, types `Paths`, `GatedOp`, `GatedField`, `Api` |
-| `<outDir>/index.ts`                 | `majors`, `SupportedMajor`, and `PathsV<n>`, `GatedOpV<n>`, `GatedFieldV<n>` aliases                                                                                              |
+| `<outDir>/v<n>/sdk/**`              | Hey API only, instead of `schema.d.ts`: its client, SDK functions, types and TanStack Query helpers                                                                              |
+| `<outDir>/v<n>/core.ts`, `gated.ts` | Hey API only: re-exports of the functions of floor operations and of operations added after the floor; `client.ts` exposes them as `$api` and `$gated`                          |
+| `<outDir>/index.ts`                 | `majors`, `SupportedMajor`, and `PathsV<n>` (not with Hey API), `GatedOpV<n>`, `GatedFieldV<n>` aliases                                                                           |
 
-Codegen generates everything first, then replaces each file atomically (temp file + rename) and leaves unchanged files untouched, so tools reading `outDir` during a regen never see a missing or half-written file. Every changed file is written to a temp file before any is renamed, so a disk-full or permission error while writing leaves the previous output whole. Two codegen runs on the same `outDir` take turns: the write phase holds `<outDir>/.openapi-versions.lock` (milliseconds) and removes it when done; a lock left by a killed run is taken over once its process is gone or it is 30 s old. It deletes the `v<n>` dirs it generated for majors no longer in `majors`; other files in `outDir` are kept.
+Codegen generates everything first, then replaces each file atomically (temp file + rename) and leaves unchanged files untouched, so tools reading `outDir` during a regen never see a missing or half-written file. Every changed file is written to a temp file before any is renamed, so a disk-full or permission error while writing leaves the previous output whole. Two codegen runs on the same `outDir` take turns: the write phase holds `<outDir>/.openapi-versions.lock` (milliseconds) and removes it when done; a lock left by a killed run is taken over once its process is gone or it is 30 s old. It deletes the `v<n>` dirs it generated for majors no longer in `majors`, and inside `v<n>` the files it wrote before but not this time (the other stack's after a `generator` change, a file Hey API no longer emits); other files in `outDir` are kept.
 
 ## Runtime API
 
