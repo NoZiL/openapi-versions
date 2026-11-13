@@ -59,10 +59,14 @@ describe("Hey API codegen", () => {
     expect(out.exists("schema.d.ts")).toBe(false);
     expect(out.exists("core.ts")).toBe(true);
 
+    // a file an earlier Hey API version emitted (it is in the manifest) and this one does not
     fs.mkdirSync(path.join(out.dir, "sdk", "old"), { recursive: true });
     fs.writeFileSync(path.join(out.dir, "sdk", "old", "gone.gen.ts"), "");
+    const manifest = path.join(out.dir, ".openapi-versions-files.json");
+    fs.writeFileSync(manifest, JSON.stringify([...JSON.parse(fs.readFileSync(manifest, "utf8")), "sdk/old/gone.gen.ts"]));
     out = await gen("test/fixtures/specs", "1.3.0", "hey-api", outDir);
     expect(out.exists("sdk/old")).toBe(false);
+    expect(out.exists("sdk/client")).toBe(true);
 
     out = await gen("test/fixtures/specs", "1.3.0", "openapi-typescript", outDir);
     for (const file of ["sdk", "core.ts", "gated.ts"]) expect(out.exists(file)).toBe(false);
@@ -113,9 +117,36 @@ describe("Hey API codegen", () => {
     const outDir = tmp();
     fs.mkdirSync(path.join(outDir, "v1", "sdk"), { recursive: true });
     for (const file of ["core.ts", "sdk/mine.ts"]) fs.writeFileSync(path.join(outDir, "v1", file), "// the app's own");
-    const out = await gen("test/fixtures/specs", "1.3.0", "openapi-typescript", outDir);
-    expect(out.exists("core.ts")).toBe(true);
-    expect(out.exists("sdk/mine.ts")).toBe(true);
+    // twice: from the second run on, v1/meta.ts is codegen's, and files it never wrote must still be kept
+    for (const generator of ["openapi-typescript", "openapi-typescript", "hey-api", "hey-api"] as const) {
+      const out = await gen("test/fixtures/specs", "1.3.0", generator, outDir);
+      expect(out.read("sdk/mine.ts")).toBe("// the app's own");
+      // core.ts is a name the Hey API path writes (and then owns), like schema.d.ts on the other path
+      if (generator === "openapi-typescript") expect(out.read("core.ts")).toBe("// the app's own");
+    }
+  });
+
+  it("explains why Hey API failed instead of an empty JobError or a temp-folder ENOENT", async () => {
+    const jobError = Object.assign(new Error(""), { originalError: { error: new Error("Missing $ref pointer") } });
+    await expect(
+      generateHeyApi(
+        {
+          createClient: async () => {
+            throw jobError;
+          },
+        },
+        {},
+      ),
+    ).rejects.toThrow("Hey API failed: Missing $ref pointer");
+    await expect(generateHeyApi({ createClient: async () => [] }, {})).rejects.toThrow(/Hey API generated nothing.*\$refs/);
+  });
+
+  it("refuses two functions with one name from different modules", () => {
+    const ops: HeyApiOperation[] = [
+      { id: "getUsers", opKey: "get /users", exports: { "./sdk/@tanstack/react-query.gen": ["getUsersOptions"] } },
+      { id: "getUsersOptions", opKey: "get /users/options", exports: { "./sdk/sdk.gen": ["getUsersOptions"] } },
+    ];
+    expect(() => reexports(ops, "c", "// h")).toThrow(/"getUsersOptions" from both .*react-query\.gen and \.\/sdk\/sdk\.gen/);
   });
 
   it("writes a module even with nothing gated", () => {

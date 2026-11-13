@@ -45,23 +45,36 @@ export async function generateHeyApi({ createClient }: HeyApiModule, doc: unknow
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "openapi-versions-hey-api-"));
   try {
     // an explicit, empty config file: otherwise Hey API also loads the app's openapi-ts.config.* from the
-    // working directory and merges it under ours (another file suffix, filters, post-processors...)
+    // working directory and merges it under ours (another file suffix, filters, post-processors...).
+    // Hey API's loader (c12) still reads a `.openapi-tsrc` there; that rare file is not isolated.
     const configFile = path.join(tmp, "openapi-ts.config.json");
     fs.writeFileSync(configFile, "{}");
     const out = path.join(tmp, "out");
-    const [ctx] = (await createClient({
-      configFile,
-      input: structuredClone(doc),
-      // no import extension and no barrel, whatever the app's tsconfig says: apps import from v<n>/client.ts
-      output: { path: out, module: { extension: null }, entryFile: false },
-      logs: { level: "silent", file: false },
-      plugins: [
-        "@hey-api/client-fetch",
-        { name: "@hey-api/typescript", $resolvers: openEnumsHeyApi },
-        "@hey-api/sdk",
-        "@tanstack/react-query",
-      ],
-    })) as any[];
+    let results: unknown;
+    try {
+      results = await createClient({
+        configFile,
+        input: structuredClone(doc),
+        // no import extension and no barrel, whatever the app's tsconfig says: apps import from v<n>/client.ts
+        output: { path: out, module: { extension: null }, entryFile: false },
+        logs: { level: "silent", file: false },
+        plugins: [
+          "@hey-api/client-fetch",
+          { name: "@hey-api/typescript", $resolvers: openEnumsHeyApi },
+          "@hey-api/sdk",
+          "@tanstack/react-query",
+        ],
+      });
+    } catch (e) {
+      // Hey API wraps every job error as JobError("") and keeps the cause in originalError; logs are silent
+      const cause = (e as { originalError?: { error?: unknown } })?.originalError?.error;
+      if (cause instanceof Error) throw new Error(`Hey API failed: ${cause.message}`, { cause });
+      throw e;
+    }
+    // Hey API reports an input it cannot read (an unresolvable $ref, ...) by returning no job, not by throwing
+    const ctx = Array.isArray(results) ? results[0] : undefined;
+    if (!ctx || !fs.existsSync(out))
+      throw new Error("Hey API generated nothing: it could not read the merged spec (check for unresolvable $refs in merged.openapi.json)");
     return { files: readTree(out), operations: readOperations(ctx, out) };
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
@@ -104,8 +117,9 @@ function readOperations(ctx: any, root: string): HeyApiOperation[] {
  */
 export function checkOperations(operations: HeyApiOperation[], ops: readonly string[]): void {
   const problems: string[] = [];
+  const byKey = new Map(operations.map((o) => [o.opKey, o]));
   for (const op of ops) {
-    const found = operations.find((o) => o.opKey === op);
+    const found = byKey.get(op);
     if (!found) problems.push(`${op}: no operation in Hey API's IR`);
     else
       for (const mod of REQUIRED_MODULES)
@@ -125,8 +139,20 @@ export function opIds(operations: HeyApiOperation[]): Record<string, string> {
 /** Source of core.ts or gated.ts: named re-exports, one line per module. */
 export function reexports(operations: HeyApiOperation[], comment: string, header: string): string {
   const byModule = new Map<string, string[]>();
+  const from = new Map<string, string>();
   for (const op of operations)
-    for (const [mod, names] of Object.entries(op.exports)) byModule.set(mod, [...(byModule.get(mod) ?? []), ...names]);
+    for (const [mod, names] of Object.entries(op.exports)) {
+      byModule.set(mod, [...(byModule.get(mod) ?? []), ...names]);
+      for (const name of names) {
+        // e.g. the options of `GET /users` and the sdk function of `GET /users/options` are both `getUsersOptions`
+        const other = from.get(name);
+        if (other !== undefined && other !== mod)
+          throw new Error(
+            `Hey API exports "${name}" from both ${other} and ${mod}, so they cannot be re-exported together. Give the operations an operationId that does not end like a helper (Options, Mutation, QueryKey).`,
+          );
+        from.set(name, mod);
+      }
+    }
   const lines = [...byModule]
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([mod, names]) => `export { ${[...names].sort().join(", ")} } from ${JSON.stringify(mod)};`);
