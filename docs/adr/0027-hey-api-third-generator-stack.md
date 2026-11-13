@@ -1,6 +1,6 @@
 # 0027. Support Hey API as a third, opt-in generator stack
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-12
 - Amends: [0017](0017-support-openapi-typescript-and-openapi-typesafe.md) (a third value for `generator`, a third runtime entry, a third CI job)
 

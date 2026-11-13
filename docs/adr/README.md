@@ -50,4 +50,4 @@ Small fixes, dependency bumps and refactors need none. Take the next free number
 | [0024](0024-stop-hook-adr-block-once-per-policy-change.md) | Stop hook raises the missing-ADR block once per session and policy content, not every turn; amends 0013 | accepted |
 | [0025](0025-hook-tests-in-ci.md) | CI and `mise run check` run the Claude Code hook tests (`test:hooks`); `check:fast` does not; amends 0015 | accepted, amended by 0026 |
 | [0026](0026-ci-runs-mise-check.md) | CI runs `mise run --continue-on-error --output keep-order check`; `[tasks.check]` is the only list of checks; amends 0025 | accepted |
-| [0027](0027-hey-api-third-generator-stack.md) | Support Hey API as a third, opt-in, experimental generator stack: `generator: "hey-api"`, op-ID `gate()`, `openapi-versions/hey-api` entry; amends 0017 | proposed |
+| [0027](0027-hey-api-third-generator-stack.md) | Support Hey API as a third, opt-in, experimental generator stack: `generator: "hey-api"`, op-ID `gate()`, `openapi-versions/hey-api` entry; amends 0017 | accepted |
