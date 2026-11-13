@@ -14,7 +14,7 @@ export interface Config {
   specsDir: string;
   outDir: string;
   majors: Record<string, { floor: string }>;
-  /** Module the generated client.ts imports the runtime from. Default: the package name. */
+  /** Module the generated client.ts imports the runtime from. Default: the package name, or its `/hey-api` entry for Hey API. */
   runtimeImport?: string;
   /** Breaking-change gate. Default "auto". */
   gate?: GateMode;
@@ -23,6 +23,8 @@ export interface Config {
 }
 
 export const DEFAULT_RUNTIME_IMPORT = "openapi-versions";
+/** Runtime entry for Hey API output (ADR 0027): its own build, no openapi-fetch. */
+export const DEFAULT_HEY_API_RUNTIME_IMPORT = "openapi-versions/hey-api";
 
 export function validateConfig(raw: unknown, source = "config"): Config {
   const fail = (msg: string): never => {

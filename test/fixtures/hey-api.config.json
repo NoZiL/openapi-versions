@@ -1,0 +1,8 @@
+{
+  "$schema": "../../openapi-versions.schema.json",
+  "specsDir": "test/fixtures/specs",
+  "outDir": "test/fixtures/generated/hey-api",
+  "majors": { "1": { "floor": "1.3.0" } },
+  "generator": "hey-api",
+  "runtimeImport": "../../../../../src/hey-api"
+}

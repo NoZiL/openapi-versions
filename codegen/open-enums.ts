@@ -10,6 +10,7 @@
  *
  * - openapi-typescript: `openEnums` returns a `ts.factory` node, built with the `typescript` that openapi-typescript loads.
  * - openapi-typesafe: `openEnumsIr` (with `irCallbacks: true`) returns an IR union built with its helpers; no `typescript` needed.
+ * - Hey API: `openEnumsHeyApi` are `$resolvers` for `@hey-api/typescript`, built with its type DSL (ADR 0027).
  *   An IR node, not type text: the printer adds the parentheses a union needs inside an array or intersection.
  *
  * Each stack is loaded on first use only, so an app needs only the one it picks.
@@ -74,3 +75,35 @@ export const openEnumsIr =
     const emptyObject: IrType = { kind: "object", members: [] };
     return tsUnion([...e.values.map((v) => tsLiteral(v)), tsIntersection([STRING, emptyObject]), ...(e.nullable ? [NULL] : [])]);
   };
+
+/**
+ * Hey API `$resolvers` for `@hey-api/typescript` (ADR 0027), built with Hey API's own type DSL (`ctx.$`), so its
+ * printer adds the parentheses a union needs inside an array or intersection.
+ * - `string`: a plain extensible string enum.
+ * - `union`: a nullable one. Hey API splits `type: ["string", "null"]` (3.1) and `nullable: true` (3.0) into a union
+ *   whose string member has lost `x-extensible-enum`; the parent schema still has it.
+ * Internal: not exported from the package.
+ */
+export const openEnumsHeyApi = {
+  string: (ctx: any): unknown => {
+    const values = extensibleEnum(ctx.schema)?.values;
+    return values && openUnionHeyApi(ctx.$, values, false);
+  },
+  union: (ctx: any): unknown => {
+    const schema = ctx.parentSchema;
+    const items: { type?: unknown }[] = schema?.items ?? [];
+    const values = extensibleEnum({ ...schema, type: "string" })?.values;
+    if (!values || !items.some((i) => i.type === "string") || !items.every((i) => i.type === "string" || i.type === "null"))
+      return undefined;
+    return openUnionHeyApi(
+      ctx.$,
+      values,
+      items.some((i) => i.type === "null"),
+    );
+  },
+};
+
+function openUnionHeyApi($: any, values: string[], nullable: boolean): unknown {
+  const open = $.type.and($.type("string"), $.type.object());
+  return $.type.or(...values.map((v) => $.type.literal(v)), open, ...(nullable ? [$.type("null")] : []));
+}

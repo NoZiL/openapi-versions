@@ -9,6 +9,9 @@
  *     5. the generator on the merged doc, with open enums
  *
  *   output: <outDir>/v<major>/{schema.d.ts, meta.ts, merged.openapi.json, client.ts} + <outDir>/index.ts
+ *   Hey API (ADR 0027) writes v<major>/{sdk/**, core.ts, gated.ts} instead of schema.d.ts (see hey-api.ts).
+ *   Each v<major>/ lists what it wrote in .openapi-versions-files.json; the next run removes, under the
+ *   same lock, what it wrote before and not now (another generator, a file Hey API dropped).
  *   Files are replaced in place, never deleted first, so a concurrent reader (tsc, vitest, vite)
  *   never sees a missing file (ADR 0021). The write phase holds a lock file in outDir, so two runs
  *   on one outDir never interleave their writes, and stages every changed file before renaming any
@@ -21,8 +24,9 @@ import fs from "node:fs";
 import path from "node:path";
 import semver from "semver";
 import { type BreakingResult, checkChain, probeOasdiff } from "./breaking";
-import { type Config, DEFAULT_RUNTIME_IMPORT, type GateMode } from "./config";
+import { type Config, DEFAULT_HEY_API_RUNTIME_IMPORT, DEFAULT_RUNTIME_IMPORT, type GateMode } from "./config";
 import { loadGenerator } from "./generator";
+import { checkOperations, HEY_API_SDK_DIR, heyApiClientSource, opIds, reexports } from "./hey-api";
 import { withOutDirLock } from "./lock";
 import { mergeAll } from "./merge";
 import { computeSince, type VersionedDoc } from "./since";
@@ -97,7 +101,53 @@ export async function build(
     const { ops, gatedOps, gatedFields } = computeSince(docs, floor);
 
     const out = path.join(config.outDir, `v${major}`);
-    const meta = { major, floor, newest: group.at(-1)!.version, specs: group.map((g) => g.version), ops, gatedOps, gatedFields };
+    const meta: {
+      major: number;
+      floor: string;
+      newest: string;
+      specs: string[];
+      ops: string[];
+      gatedOps: Record<string, string>;
+      gatedFields: Record<string, string>;
+      /** Hey API only: operation id (query key `_id`) -> op key, what gate() reads */
+      opIds?: Record<string, string>;
+    } = {
+      major,
+      floor,
+      newest: group.at(-1)!.version,
+      specs: group.map((g) => g.version),
+      ops,
+      gatedOps,
+      gatedFields,
+    };
+    const majorWrites: [file: string, content: string][] = [];
+    if (generator!.kind === "sdk") {
+      const { files, operations } = await generator!.generate(merged);
+      checkOperations(operations, ops);
+      meta.opIds = opIds(operations);
+      for (const [rel, content] of Object.entries(files)) majorWrites.push([path.join(out, HEY_API_SDK_DIR, ...rel.split("/")), content]);
+      const gated = (o: (typeof operations)[number]) => o.opKey in gatedOps;
+      majorWrites.push([
+        path.join(out, "core.ts"),
+        reexports(
+          operations.filter((o) => !gated(o)),
+          "Operations every supported backend has (floor and older): call them directly.",
+          HEADER,
+        ),
+      ]);
+      majorWrites.push([
+        path.join(out, "gated.ts"),
+        reexports(
+          operations.filter(gated),
+          "Operations added after the floor: queries go through gate(), mutations inside <Feature>.",
+          HEADER,
+        ),
+      ]);
+      majorWrites.push([path.join(out, "client.ts"), heyApiClientSource(config.runtimeImport ?? DEFAULT_HEY_API_RUNTIME_IMPORT, HEADER)]);
+    } else {
+      majorWrites.push([path.join(out, "schema.d.ts"), await generator!.generate(merged)]);
+      majorWrites.push([path.join(out, "client.ts"), clientSource(config.runtimeImport ?? DEFAULT_RUNTIME_IMPORT)]);
+    }
     // meta.ts first: its header marks the dir as codegen's (droppedMajors), even if a run dies after it
     writes.push([
       path.join(out, "meta.ts"),
@@ -108,8 +158,7 @@ export async function build(
         `export type GatedField = keyof typeof meta.gatedFields;\n`,
     ]);
     writes.push([path.join(out, "merged.openapi.json"), `${JSON.stringify(merged, null, 2)}\n`]);
-    writes.push([path.join(out, "schema.d.ts"), await generator!.generate(merged)]);
-    writes.push([path.join(out, "client.ts"), clientSource(config.runtimeImport ?? DEFAULT_RUNTIME_IMPORT)]);
+    writes.push(...majorWrites);
     log(
       `gen  v${major}: ${meta.specs.join(", ")} -> ${out} with ${generator!.name} (${Object.keys(gatedOps).length} gated ops, ${Object.keys(gatedFields).length} gated fields)`,
     );
@@ -125,21 +174,40 @@ export async function build(
         majors.map((m) => `import { meta as v${m} } from "./v${m}/meta";`).join("\n") +
         `\n\nexport const majors = { ${majors.map((m) => `${m}: v${m}`).join(", ")} } as const;\n` +
         `export type SupportedMajor = keyof typeof majors;\n` +
-        majors.map((m) => `export type { paths as PathsV${m} } from "./v${m}/schema";`).join("\n") +
-        "\n" +
+        (generator!.kind === "schema"
+          ? `${majors.map((m) => `export type { paths as PathsV${m} } from "./v${m}/schema";`).join("\n")}\n`
+          : "") +
         majors.map((m) => `export type { GatedOp as GatedOpV${m}, GatedField as GatedFieldV${m} } from "./v${m}/meta";`).join("\n") +
         "\n",
     ]);
     // Nothing to change (same generation on disk, nothing to prune): skip the lock too, so a no-op
     // regen does not touch outDir at all. Otherwise serialize with other codegen runs on this
     // outDir, so the last one leaves one whole generation (ADR 0023).
-    if (writes.some(([file, content]) => !isSame(file, Buffer.from(content))) || droppedMajors(config.outDir, majors).length) {
+    // Each v<n> records what it wrote; next time, what it wrote before and not now is removed (a `generator`
+    // change, a file Hey API stopped emitting). Files codegen never wrote, the app's own included, are kept.
+    const stale: string[] = [];
+    for (const m of majors) {
+      const dir = path.join(config.outDir, `v${m}`);
+      const now = writes.map(([file]) => path.relative(dir, file).split(path.sep).join("/")).filter((rel) => !rel.startsWith("../"));
+      stale.push(
+        ...readManifest(dir)
+          .filter((rel) => !now.includes(rel))
+          .map((rel) => path.join(dir, ...rel.split("/"))),
+      );
+      writes.push([path.join(dir, MANIFEST), `${JSON.stringify(now.sort(), null, 2)}\n`]);
+    }
+    if (
+      writes.some(([file, content]) => !isSame(file, Buffer.from(content))) ||
+      droppedMajors(config.outDir, majors).length ||
+      stale.some((file) => fs.existsSync(file))
+    ) {
       await withOutDirLock(config.outDir, () => {
         for (const dir of new Set(writes.map(([file]) => path.dirname(file)))) {
           fs.mkdirSync(dir, { recursive: true });
           removeStaleTemps(dir);
         }
         writeChanged(writes);
+        for (const file of stale) removeFileAndEmptyParents(file, config.outDir);
         for (const dir of droppedMajors(config.outDir, majors)) fs.rmSync(dir, { recursive: true, force: true });
       });
     }
@@ -173,6 +241,36 @@ function droppedMajors(outDir: string, majors: number[]): string[] {
     if (meta.startsWith(HEADER)) dropped.push(dir);
   }
   return dropped;
+}
+
+/** v<n>/<MANIFEST>: the paths (relative to v<n>) the last generation wrote, so the next one can prune exactly those. */
+const MANIFEST = ".openapi-versions-files.json";
+
+function readManifest(dir: string): string[] {
+  try {
+    const list: unknown = JSON.parse(fs.readFileSync(path.join(dir, MANIFEST), "utf8"));
+    // only plain relative paths inside v<n>: a hand-edited manifest cannot reach outside it
+    return Array.isArray(list)
+      ? list.filter(
+          (rel): rel is string =>
+            typeof rel === "string" && !!rel && !rel.split("/").some((p) => p === ".." || p === "") && rel !== MANIFEST,
+        )
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Removes a file, then its parent folders while they are empty, up to (not including) `root`. */
+function removeFileAndEmptyParents(file: string, root: string): void {
+  fs.rmSync(file, { force: true });
+  for (let dir = path.dirname(file); path.relative(root, dir) && !path.relative(root, dir).startsWith(".."); dir = path.dirname(dir)) {
+    try {
+      fs.rmdirSync(dir); // fails when not empty: stop there
+    } catch {
+      return;
+    }
+  }
 }
 
 /** Temp files left by a codegen killed between write and rename; a live run's temp is seconds old. */
