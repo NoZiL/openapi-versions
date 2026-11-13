@@ -36,16 +36,24 @@ export interface HeyApiOutput {
 /** Only the part of `@hey-api/openapi-ts` this module uses. */
 type HeyApiModule = { createClient: (config: any) => Promise<unknown> };
 
-const SDK_DIR = "sdk";
+export const HEY_API_SDK_DIR = "sdk";
+/** Every operation must have a function in each: the sdk call, and its TanStack options or mutation helper. */
+const REQUIRED_MODULES = [`./${HEY_API_SDK_DIR}/sdk.gen`, `./${HEY_API_SDK_DIR}/@tanstack/react-query.gen`];
 
 /** Runs Hey API on `doc` in a temp folder and reads everything back, so build.ts stages it with the rest (ADR 0021, 0023). */
 export async function generateHeyApi({ createClient }: HeyApiModule, doc: unknown): Promise<HeyApiOutput> {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "openapi-versions-hey-api-"));
   try {
+    // an explicit, empty config file: otherwise Hey API also loads the app's openapi-ts.config.* from the
+    // working directory and merges it under ours (another file suffix, filters, post-processors...)
+    const configFile = path.join(tmp, "openapi-ts.config.json");
+    fs.writeFileSync(configFile, "{}");
+    const out = path.join(tmp, "out");
     const [ctx] = (await createClient({
+      configFile,
       input: structuredClone(doc),
       // no import extension and no barrel, whatever the app's tsconfig says: apps import from v<n>/client.ts
-      output: { path: tmp, module: { extension: null }, entryFile: false },
+      output: { path: out, module: { extension: null }, entryFile: false },
       logs: { level: "silent", file: false },
       plugins: [
         "@hey-api/client-fetch",
@@ -54,7 +62,7 @@ export async function generateHeyApi({ createClient }: HeyApiModule, doc: unknow
         "@tanstack/react-query",
       ],
     })) as any[];
-    return { files: readTree(tmp), operations: readOperations(ctx, tmp) };
+    return { files: readTree(out), operations: readOperations(ctx, out) };
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
@@ -83,22 +91,25 @@ function readOperations(ctx: any, root: string): HeyApiOperation[] {
     const file = s.file?.finalPath ?? s.file?.path;
     const name = s.finalName ?? s.name;
     if (!op || typeof file !== "string" || typeof name !== "string") continue;
-    const mod = `./${[SDK_DIR, ...path.relative(root, file).split(path.sep)].join("/").replace(/\.ts$/, "")}`;
+    const mod = `./${[HEY_API_SDK_DIR, ...path.relative(root, file).split(path.sep)].join("/").replace(/\.ts$/, "")}`;
     op.exports[mod] = [...(op.exports[mod] ?? []), name];
   }
   return [...byId.values()];
 }
 
 /**
- * Every operation codegen knows (`meta.ops`) must have a Hey API id and at least one exported function.
- * Otherwise a Hey API change would drop an operation from core.ts/gated.ts, or leave gate() unable to find it.
+ * Every operation codegen knows (`meta.ops`) must have a Hey API id, an sdk function and a TanStack helper.
+ * Otherwise a Hey API change would drop an operation, or one of its functions, from core.ts/gated.ts, or
+ * leave gate() unable to find it.
  */
 export function checkOperations(operations: HeyApiOperation[], ops: readonly string[]): void {
   const problems: string[] = [];
   for (const op of ops) {
     const found = operations.find((o) => o.opKey === op);
     if (!found) problems.push(`${op}: no operation in Hey API's IR`);
-    else if (!Object.keys(found.exports).length) problems.push(`${op}: Hey API exported no function for "${found.id}"`);
+    else
+      for (const mod of REQUIRED_MODULES)
+        if (!found.exports[mod]?.length) problems.push(`${op}: Hey API exported no function for "${found.id}" from ${mod}`);
   }
   if (problems.length)
     throw new Error(
@@ -128,7 +139,7 @@ export function heyApiClientSource(runtimeImport: string, header: string): strin
   return (
     `${header}\n` +
     `import { createHeyApiAware } from ${JSON.stringify(runtimeImport)};\n` +
-    `import { client } from "./${SDK_DIR}/client.gen";\n` +
+    `import { client } from "./${HEY_API_SDK_DIR}/client.gen";\n` +
     `import { meta, type GatedOp, type GatedField } from "./meta";\n\n` +
     `const runtime = createHeyApiAware<GatedOp, GatedField>(meta, client);\n\n` +
     `export const { ApiVersionProvider, useApi, useSupports, useHasField, useSunset, Feature, createApi } = runtime;\n` +
@@ -136,10 +147,8 @@ export function heyApiClientSource(runtimeImport: string, header: string): strin
     `export * as $api from "./core";\n` +
     `/** Operations added after the floor: useQuery(gate($gated.xxxOptions(...))), $gated.xxxMutation() inside <Feature>. */\n` +
     `export * as $gated from "./gated";\n` +
-    `export type * from "./${SDK_DIR}/types.gen";\n` +
+    `export type * from "./${HEY_API_SDK_DIR}/types.gen";\n` +
     `export type { GatedOp, GatedField };\n` +
     `export type Api = ReturnType<typeof useApi>;\n`
   );
 }
-
-export const HEY_API_SDK_DIR: string = SDK_DIR;

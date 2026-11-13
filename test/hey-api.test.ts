@@ -5,7 +5,7 @@ import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import { build } from "../codegen/build";
 import type { GeneratorName } from "../codegen/generator";
-import { checkOperations, type HeyApiOperation, reexports } from "../codegen/hey-api";
+import { checkOperations, generateHeyApi, type HeyApiOperation, reexports } from "../codegen/hey-api";
 
 const dirs: string[] = [];
 const tmp = () => {
@@ -85,14 +85,37 @@ describe("Hey API codegen", () => {
   });
 
   it("fails when Hey API's output no longer matches the specs", () => {
+    const both = { "./sdk/sdk.gen": ["getUser"], "./sdk/@tanstack/react-query.gen": ["getUserOptions"] };
     const ops: HeyApiOperation[] = [
-      { id: "getUser", opKey: "get /users/{id}", exports: { "./sdk/sdk.gen": ["getUser"] } },
-      { id: "archiveUser", opKey: "post /users/{id}/archive", exports: {} },
+      { id: "getUser", opKey: "get /users/{id}", exports: both },
+      // the TanStack plugin stopped tagging its helper: the sdk function alone is not enough
+      { id: "archiveUser", opKey: "post /users/{id}/archive", exports: { "./sdk/sdk.gen": ["archiveUser"] } },
     ];
     expect(() => checkOperations(ops, ["get /users/{id}"])).not.toThrow();
     expect(() => checkOperations(ops, ["get /users/{id}", "post /users/{id}/archive", "get /users"])).toThrow(
-      /post \/users\/\{id\}\/archive: Hey API exported no function for "archiveUser"\n {2}get \/users: no operation in Hey API's IR/,
+      /post \/users\/\{id\}\/archive: Hey API exported no function for "archiveUser" from \.\/sdk\/@tanstack\/react-query\.gen\n {2}get \/users: no operation in Hey API's IR/,
     );
+  });
+
+  it("ignores the app's own openapi-ts.config.* (passes an explicit, empty config file)", async () => {
+    let seen: { configFile?: string; content?: string } = {};
+    const createClient = async (config: any) => {
+      seen = { configFile: config.configFile, content: fs.readFileSync(config.configFile, "utf8") };
+      fs.mkdirSync(config.output.path, { recursive: true }); // as Hey API does
+      return [{ ir: { paths: {} }, gen: { symbols: { query: () => [] } } }];
+    };
+    await generateHeyApi({ createClient }, { openapi: "3.1.0" });
+    expect(seen.content).toBe("{}");
+    expect(fs.existsSync(seen.configFile!)).toBe(false); // in the temp folder, removed afterwards
+  });
+
+  it("does not prune files in a v<n> dir codegen did not write", async () => {
+    const outDir = tmp();
+    fs.mkdirSync(path.join(outDir, "v1", "sdk"), { recursive: true });
+    for (const file of ["core.ts", "sdk/mine.ts"]) fs.writeFileSync(path.join(outDir, "v1", file), "// the app's own");
+    const out = await gen("test/fixtures/specs", "1.3.0", "openapi-typescript", outDir);
+    expect(out.exists("core.ts")).toBe(true);
+    expect(out.exists("sdk/mine.ts")).toBe(true);
   });
 
   it("writes a module even with nothing gated", () => {
