@@ -40,7 +40,7 @@ Small fixes, dependency bumps and refactors need none. Take the next free number
 | [0014](0014-stop-hook-never-rewrites-lockfile.md) | Stop hook fails instead of re-syncing the lockfile; amends 0013 | accepted, amended by 0020, 0022 |
 | [0015](0015-stop-hook-cache-key-covers-check-inputs.md) | Stop hook cache key covers installed deps and generated output; cached only if the run left the inputs unchanged; amends 0013 | accepted, amended by 0020, 0025 |
 | [0016](0016-build-with-tsdown.md) | Build with tsdown; `.d.ts` from TypeScript 5, no dev-only TS 7 yet | accepted, amended by 0018 |
-| [0017](0017-support-openapi-typescript-and-openapi-typesafe.md) | Support openapi-typescript and openapi-typesafe side by side; TS 5.4 to 7 on the typesafe path; amends 0005, supersedes 0012 | accepted, amended by 0019 |
+| [0017](0017-support-openapi-typescript-and-openapi-typesafe.md) | Support openapi-typescript and openapi-typesafe side by side; TS 5.4 to 7 on the typesafe path; amends 0005, supersedes 0012 | accepted, amended by 0019, 0027 |
 | [0018](0018-isolated-declarations-oxc-dts.md) | `.d.ts` from Oxc with `isolatedDeclarations` on `src/` + `codegen/`; explicit public return types; amends 0016 | accepted |
 | [0019](0019-open-enums-ir-node-on-typesafe-path.md) | The openapi-typesafe open-enum transform returns an IR node, not type text; parity ignores `\uXXXX` escaping; amends 0017 | accepted |
 | [0020](0020-check-fast-runs-codegen-once.md) | `check:fast` runs each codegen once as a shared mise dependency; typecheck and test only read; amends 0014, 0015 | accepted, amended by 0021 |
@@ -50,3 +50,4 @@ Small fixes, dependency bumps and refactors need none. Take the next free number
 | [0024](0024-stop-hook-adr-block-once-per-policy-change.md) | Stop hook raises the missing-ADR block once per session and policy content, not every turn; amends 0013 | accepted |
 | [0025](0025-hook-tests-in-ci.md) | CI and `mise run check` run the Claude Code hook tests (`test:hooks`); `check:fast` does not; amends 0015 | accepted, amended by 0026 |
 | [0026](0026-ci-runs-mise-check.md) | CI runs `mise run --continue-on-error --output keep-order check`; `[tasks.check]` is the only list of checks; amends 0025 | accepted |
+| [0027](0027-hey-api-third-generator-stack.md) | Support Hey API as a third, opt-in, experimental generator stack: `generator: "hey-api"`, op-ID `gate()`, `openapi-versions/hey-api` entry; amends 0017 | accepted |
