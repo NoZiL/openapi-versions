@@ -14,6 +14,8 @@ npm i openapi-fetch openapi-react-query @tanstack/react-query react   # peers: t
 npm i -D openapi-typescript "typescript@<7"
 ```
 
+With the openapi-typesafe generator (Node 22+), install its stack instead: `openapi-typesafe-fetch openapi-typesafe-react-query` as the runtime peers and `-D openapi-typesafe`; the generated client then imports `openapi-versions/typesafe` ([reference](reference.md#package-entry-points)).
+
 `openapi-versions` is a layer on the openapi-ts packages, not a replacement: it generates types with `openapi-typescript`, calls with `openapi-fetch`, hooks with `openapi-react-query`. React and TanStack Query are optional; without them use `openapi-versions/core`.
 
 Open enums need a one-line fix to `openapi-typescript-helpers` (see [troubleshooting](troubleshooting.md)); apply `patches/` with `patch-package` in your app until it lands upstream.

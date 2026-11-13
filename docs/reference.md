@@ -34,7 +34,7 @@ Exit code 1 on: invalid config, no generator installed (or the configured one mi
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
 | `openapi-versions`             | Runtime: `createVersionAware(meta)` (core + React), plus the core exports                                                      |
 | `openapi-versions/core`        | Framework-free runtime: `resolveCompat`, `createApi`, `createApiClient`, `fetchBackendVersion`, `createVersionAwareCore(meta)` |
-| `openapi-versions/typesafe`    | Same as `openapi-versions`, built against the openapi-typesafe stack (`openapi-typesafe-fetch`, `openapi-typesafe-react-query`). The generated `client.ts` imports it when the generator is openapi-typesafe |
+| `openapi-versions/typesafe`    | Same as `openapi-versions`, built against the openapi-typesafe stack (`openapi-typesafe-fetch`, `openapi-typesafe-react-query`). The generated `client.ts` imports it when the generator is openapi-typesafe. Node 22+, like the openapi-typesafe packages |
 | `openapi-versions/typesafe/core` | Same as `openapi-versions/core`, built against the openapi-typesafe stack                                                  |
 | `openapi-versions/codegen`     | Programmatic codegen API                                                                                                       |
 | `openapi-versions/schema.json` | JSON Schema of the config                                                                                                      |

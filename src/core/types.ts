@@ -1,6 +1,7 @@
 /**
- * The methods a path item can have. Same union as `HttpMethod` in openapi-typescript-helpers and
- * openapi-typesafe-helpers, written out so the runtime does not depend on either (ADR 0017).
+ * The methods a path item can have: `HttpMethod` of openapi-typescript-helpers, written out so the
+ * runtime does not depend on a helpers package (ADR 0017). openapi-typesafe-helpers also has
+ * OpenAPI 3.2's `query`, which codegen does not gate yet (#136); add it here when it does.
  */
 type HttpMethod = "get" | "put" | "post" | "delete" | "options" | "head" | "patch" | "trace";
 
