@@ -72,6 +72,24 @@ describe("generator parity", () => {
   });
 });
 
+describe("runtime import", () => {
+  it.each([
+    ["openapi-typescript", "openapi-versions"],
+    ["openapi-typesafe", "openapi-versions/typesafe"],
+  ] as const)("client.ts generated with %s imports %s by default", async (generator, runtime) => {
+    const outDir = tmp();
+    await build({ specsDir: "test/fixtures/specs", outDir, majors: { 1: { floor: "1.3.0" } }, generator, gate: "off" }, { log: () => {} });
+    expect(fs.readFileSync(path.join(outDir, "v1", "client.ts"), "utf8")).toContain(`import { createVersionAware } from "${runtime}";`);
+  });
+
+  it("keeps an explicit runtimeImport whatever the generator", async () => {
+    const outDir = tmp();
+    const config = { specsDir: "test/fixtures/specs", outDir, majors: { 1: { floor: "1.3.0" } }, runtimeImport: "./rt" };
+    await build({ ...config, generator: "openapi-typesafe", gate: "off" }, { log: () => {} });
+    expect(fs.readFileSync(path.join(outDir, "v1", "client.ts"), "utf8")).toContain(`from "./rt";`);
+  });
+});
+
 describe("generator selection", () => {
   const fake = (installed: GeneratorName[]) => async (name: GeneratorName) =>
     installed.includes(name) ? { name, generate: async () => "" } : undefined;

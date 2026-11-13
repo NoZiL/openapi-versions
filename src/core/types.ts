@@ -1,4 +1,9 @@
-import type { HttpMethod } from "openapi-typescript-helpers";
+/**
+ * The methods a path item can have: `HttpMethod` of openapi-typescript-helpers, written out so the
+ * runtime does not depend on a helpers package (ADR 0017). openapi-typesafe-helpers also has
+ * OpenAPI 3.2's `query`, which codegen does not gate yet (#136); add it here when it does.
+ */
+type HttpMethod = "get" | "put" | "post" | "delete" | "options" | "head" | "patch" | "trace";
 
 /**
  * `paths` with the gated operations removed (turned into `method?: never`, exactly how

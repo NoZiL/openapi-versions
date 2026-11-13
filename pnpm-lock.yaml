@@ -212,6 +212,15 @@ importers:
       openapi-typesafe:
         specifier: 1.0.0-rc.4
         version: 1.0.0-rc.4(typescript@5.9.3)
+      openapi-typesafe-fetch:
+        specifier: 1.0.0-rc.4
+        version: 1.0.0-rc.4
+      openapi-typesafe-helpers:
+        specifier: 1.0.0-rc.4
+        version: 1.0.0-rc.4
+      openapi-typesafe-react-query:
+        specifier: 1.0.0-rc.4
+        version: 1.0.0-rc.4(@tanstack/react-query@5.107.1(@types/react@19.3.0)(react@19.3.1))(openapi-typesafe-fetch@1.0.0-rc.4)
       openapi-typescript:
         specifier: ^7.13.0
         version: 7.13.0(typescript@5.9.3)
@@ -1250,6 +1259,21 @@ packages:
     peerDependencies:
       '@tanstack/react-query': ^5.80.0
       openapi-fetch: ^0.17.0
+
+  openapi-typesafe-fetch@1.0.0-rc.4:
+    resolution: {integrity: sha512-74qOgtQ1vwUPh8YJJXYzJ4JSh56N8Ro4oiDzKgbV7IAzX4Lr5yHL7JMY18AtfQMS1iAf5UyDX2WBereH+6jgag==}
+    engines: {node: '>=22'}
+
+  openapi-typesafe-helpers@1.0.0-rc.4:
+    resolution: {integrity: sha512-Pfishw3ND56P8+3HpDGn6Ugnvpi9kQIfrXeZOqi0Cx4sB2r5T+aWvC0Lh7Bt9p3ZKFbNDnCLzz8Q+1i+wBw5IA==}
+    engines: {node: '>=22'}
+
+  openapi-typesafe-react-query@1.0.0-rc.4:
+    resolution: {integrity: sha512-EYV6dUYaM7VZDT1w+FMbrqnQH5WqcNUztNwJNESpnCMfbbn40ibU3ubCcC8CPLhYnzcQK5BnL60pQs8IoeygEA==}
+    engines: {node: '>=22'}
+    peerDependencies:
+      '@tanstack/react-query': ^5.80.0
+      openapi-typesafe-fetch: ^1.0.0-rc.4
 
   openapi-typesafe@1.0.0-rc.4:
     resolution: {integrity: sha512-LWlZQmsQ29tyWEVBReZQq8zf9e351g9X2FwenJr5LjzupKzEpHKJ6FtK/Fut/cafLPqJ5TM4d1jBGn/+QZzr0A==}
@@ -2469,6 +2493,17 @@ snapshots:
       '@tanstack/react-query': 5.107.1(@types/react@19.3.0)(react@19.3.1)
       openapi-fetch: 0.17.0
       openapi-typescript-helpers: 0.1.0(patch_hash=5d7ef7035643499f6d289d8516a7d38e465b298852b0e877ca5603edfcf1a1a7)
+
+  openapi-typesafe-fetch@1.0.0-rc.4: {}
+
+  openapi-typesafe-helpers@1.0.0-rc.4:
+    dependencies:
+      openapi-typesafe-fetch: 1.0.0-rc.4
+
+  openapi-typesafe-react-query@1.0.0-rc.4(@tanstack/react-query@5.107.1(@types/react@19.3.0)(react@19.3.1))(openapi-typesafe-fetch@1.0.0-rc.4):
+    dependencies:
+      '@tanstack/react-query': 5.107.1(@types/react@19.3.0)(react@19.3.1)
+      openapi-typesafe-fetch: 1.0.0-rc.4
 
   openapi-typesafe@1.0.0-rc.4(typescript@5.9.3):
     dependencies:

@@ -8,7 +8,7 @@
     "codegen": "pnpm codegen:playground && pnpm codegen:test",
     "check:breaking": "tsx codegen/cli.ts --check-only --config playground/openapi-versions.config.json",
     "typecheck": "pnpm codegen && pnpm typecheck:tsc",
-    "typecheck:tsc": "tsc --noEmit && tsc -p tsconfig.build.json --noEmit",
+    "typecheck:tsc": "tsc --noEmit && tsc -p tsconfig.build.json --noEmit && tsc -p tsconfig.typesafe.json --noEmit",
     "test": "pnpm codegen:test && pnpm test:run",
     "test:run": "vitest run",
     "playground": "pnpm codegen:playground && vite --config playground/app/vite.config.ts",
@@ -31,26 +31,29 @@
     "url": "https://github.com/NoZiL/openapi-versions/issues"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.6.2",
+    "@changesets/cli": "^3.0.3",
+    "@tanstack/react-query": "^5.104.5",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^26.6.5",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@types/semver": "^7.8.0",
     "jsdom": "^31.0.0",
+    "openapi-fetch": "^0.17.0",
+    "openapi-react-query": "^0.5.4",
+    "openapi-typesafe": "1.0.0-rc.4",
+    "openapi-typesafe-fetch": "1.0.0-rc.4",
+    "openapi-typesafe-helpers": "1.0.0-rc.4",
+    "openapi-typesafe-react-query": "1.0.0-rc.4",
+    "openapi-typescript": "^7.13.0",
+    "openapi-typescript-helpers": "^0.1.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
     "tsdown": "^0.23.7",
     "tsx": "^4.23.15",
     "vite": "^8.3.5",
-    "vitest": "^5.0.5",
-    "openapi-fetch": "^0.17.0",
-    "openapi-react-query": "^0.5.4",
-    "openapi-typescript": "^7.13.0",
-    "openapi-typesafe": "1.0.0-rc.4",
-    "openapi-typescript-helpers": "^0.1.0",
-    "@tanstack/react-query": "^5.104.5",
-    "react": "^19.3.1",
-    "react-dom": "^19.3.1",
-    "@biomejs/biome": "^2.6.2",
-    "@changesets/cli": "^3.0.3"
+    "vitest": "^5.0.5"
   },
   "dependencies": {
     "semver": "^7.8.5",
@@ -71,6 +74,14 @@
       "types": "./dist/core.d.ts",
       "import": "./dist/core.js"
     },
+    "./typesafe": {
+      "types": "./dist/typesafe/index.d.ts",
+      "import": "./dist/typesafe/index.js"
+    },
+    "./typesafe/core": {
+      "types": "./dist/typesafe/core.d.ts",
+      "import": "./dist/typesafe/core.js"
+    },
     "./codegen": {
       "types": "./dist/codegen.d.ts",
       "import": "./dist/codegen.js"
@@ -89,33 +100,52 @@
     "openapi-typescript",
     "openapi-fetch",
     "openapi-react-query",
+    "openapi-typesafe",
     "api-versioning",
     "semver",
     "codegen"
   ],
   "peerDependencies": {
-    "openapi-typescript": "^7.13.0",
-    "openapi-typesafe": "^1.0.0-rc.1",
+    "@tanstack/react-query": "^5.104.5",
     "openapi-fetch": "^0.17.0",
     "openapi-react-query": "^0.5.4",
+    "openapi-typesafe": "^1.0.0-rc.1",
+    "openapi-typesafe-fetch": "^1.0.0-rc.4",
+    "openapi-typesafe-helpers": "^1.0.0-rc.4",
+    "openapi-typesafe-react-query": "^1.0.0-rc.4",
+    "openapi-typescript": "^7.13.0",
     "openapi-typescript-helpers": "^0.1.0",
-    "@tanstack/react-query": "^5.104.5",
     "react": "^19.3.1"
   },
   "peerDependenciesMeta": {
-    "openapi-typescript": {
+    "@tanstack/react-query": {
+      "optional": true
+    },
+    "openapi-fetch": {
+      "optional": true
+    },
+    "openapi-react-query": {
       "optional": true
     },
     "openapi-typesafe": {
       "optional": true
     },
+    "openapi-typesafe-fetch": {
+      "optional": true
+    },
+    "openapi-typesafe-helpers": {
+      "optional": true
+    },
+    "openapi-typesafe-react-query": {
+      "optional": true
+    },
+    "openapi-typescript": {
+      "optional": true
+    },
+    "openapi-typescript-helpers": {
+      "optional": true
+    },
     "react": {
-      "optional": true
-    },
-    "@tanstack/react-query": {
-      "optional": true
-    },
-    "openapi-react-query": {
       "optional": true
     }
   },

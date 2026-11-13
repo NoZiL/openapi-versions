@@ -1,0 +1,13 @@
+// Type-checks the runtime and its tests against the openapi-typesafe stack's types, the stack
+// dist/typesafe is built against (ADR 0017). Part of `pnpm typecheck:tsc`.
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "openapi-fetch": ["./node_modules/openapi-typesafe-fetch"],
+      "openapi-react-query": ["./node_modules/openapi-typesafe-react-query"],
+      "openapi-typescript-helpers": ["./node_modules/openapi-typesafe-helpers"]
+    }
+  },
+  "include": ["src", "test"]
+}
