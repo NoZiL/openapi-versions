@@ -8,7 +8,7 @@
  */
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { createContext, type JSX, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, type JSX, type ReactNode, useContext, useMemo, useRef, useState } from "react";
 import { type Compat, type CompatOptions, type MajorMeta, type OkCompat, resolveCompat } from "../core/compat";
 import { type ApiHeaderHandlers, fetchBackendVersion } from "../core/version";
 
@@ -36,11 +36,10 @@ export interface FeatureProps<G extends string> {
 export interface Transport<C, A extends { compat: OkCompat }> {
   /**
    * Called during render, again only when `baseUrl` or `fetch` change: children start their queries in
-   * their own effects, which run before the provider's, so the client must be ready by then.
+   * their own effects, which run before the provider's, so the client must be ready, and read headers,
+   * by then. `headers` is stable: it calls the current provider's handlers.
    */
-  connect(opts: { baseUrl: string; fetch?: typeof globalThis.fetch }): C;
-  /** Called in an effect: read X-Api-Version and Sunset on every response. Returns the cleanup. */
-  listen(client: C, handlers: ApiHeaderHandlers): () => void;
+  connect(opts: { baseUrl: string; fetch?: typeof globalThis.fetch }, headers: ApiHeaderHandlers): C;
   /** The object `useApi()` returns for one resolved backend version. */
   build(compat: OkCompat, client: C): A;
 }
@@ -95,25 +94,24 @@ export function createBindings<C, A extends { compat: OkCompat }, G extends stri
     const current = useRef<string | undefined>(undefined);
     const [sunset, setSunset] = useState<Date | undefined>(undefined);
 
-    const client = useMemo(() => transport.connect({ baseUrl, fetch: fetchImpl }), [baseUrl, fetchImpl]);
-    // in an effect, so StrictMode's mount/unmount/mount and unmounting leave exactly one listener
-    useEffect(
-      () =>
-        transport.listen(client, {
-          // Backend deployed mid-session: store the new version, refetch everything else.
-          onVersionHeader: (v) => {
-            if (current.current === undefined || v === current.current) return;
-            // update synchronously: the refetches below answer before React re-renders,
-            // and would otherwise each trigger another invalidation (refetch loop)
-            current.current = v;
-            queryClient.setQueryData(API_VERSION_KEY, v);
-            queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] !== API_VERSION_KEY[0] });
-          },
-          // same timestamp -> same state, no re-render
-          onSunsetHeader: (d) => setSunset((prev) => (prev?.getTime() === d.getTime() ? prev : d)),
-        }),
-      [client, queryClient],
+    // the handlers read refs and state setters only: one stable object for the client's lifetime
+    const headers = useMemo<ApiHeaderHandlers>(
+      () => ({
+        // Backend deployed mid-session: store the new version, refetch everything else.
+        onVersionHeader: (v) => {
+          if (current.current === undefined || v === current.current) return;
+          // update synchronously: the refetches below answer before React re-renders,
+          // and would otherwise each trigger another invalidation (refetch loop)
+          current.current = v;
+          queryClient.setQueryData(API_VERSION_KEY, v);
+          queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] !== API_VERSION_KEY[0] });
+        },
+        // same timestamp -> same state, no re-render
+        onSunsetHeader: (d) => setSunset((prev) => (prev?.getTime() === d.getTime() ? prev : d)),
+      }),
+      [queryClient],
     );
+    const client = useMemo(() => transport.connect({ baseUrl, fetch: fetchImpl }, headers), [baseUrl, fetchImpl, headers]);
 
     const version = useQuery({
       queryKey: API_VERSION_KEY,

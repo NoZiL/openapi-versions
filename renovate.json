@@ -49,6 +49,16 @@
       "allowedVersions": "<6"
     },
     {
+      "description": "the TypeScript range the Hey API path is type-checked on (ADR 0027): each alias stays on its minor, patches only",
+      "matchDepNames": ["typescript-5.5"],
+      "allowedVersions": "~5.5.0"
+    },
+    {
+      "description": "the TypeScript range the Hey API path is type-checked on (ADR 0027): each alias stays on its minor, patches only",
+      "matchDepNames": ["typescript-7.0"],
+      "allowedVersions": "~7.0.0"
+    },
+    {
       "description": "majors never automerge and are easy to spot",
       "matchUpdateTypes": ["major"],
       "labels": ["major"],

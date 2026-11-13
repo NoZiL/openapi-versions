@@ -34,8 +34,7 @@ export interface HeyApiClient {
   setConfig(config: { baseUrl?: string; fetch?: typeof globalThis.fetch }): unknown;
   interceptors: {
     response: {
-      use(fn: (response: Response, ...rest: any[]) => Response | Promise<Response>): number;
-      eject(id: number): void;
+      use(fn: (response: Response, ...rest: any[]) => Response | Promise<Response>): unknown;
     };
   };
 }
@@ -68,18 +67,12 @@ export function buildHeyApi(meta: HeyApiMeta, compat: OkCompat): HeyApi {
   };
 }
 
-/** Points the generated client at `baseUrl`. `fetch` is kept only when given. */
+/**
+ * Points the generated client at `baseUrl` and `fetch` (the global fetch when none is given, so a fetch
+ * passed earlier does not stick). The client is module-level: this re-points every user of it.
+ */
 export function connectClient(client: HeyApiClient, { baseUrl, fetch }: { baseUrl: string; fetch?: typeof globalThis.fetch }): void {
-  client.setConfig({ baseUrl, ...(fetch ? { fetch } : {}) });
-}
-
-/** Reads X-Api-Version and Sunset on every response of the generated client. Returns the cleanup. */
-export function listenClient(client: HeyApiClient, handlers: ApiHeaderHandlers): () => void {
-  const id = client.interceptors.response.use((response) => {
-    readApiHeaders(response, handlers);
-    return response;
-  });
-  return () => client.interceptors.response.eject(id);
+  client.setConfig({ baseUrl, fetch: fetch ?? ((input, init) => globalThis.fetch(input, init)) });
 }
 
 export type CreateHeyApiOptions = { baseUrl: string; fetch?: typeof globalThis.fetch } & CompatOptions;
@@ -92,19 +85,29 @@ export interface HeyApiAware<G extends string, F extends string> extends Binding
 
 /** Binds the runtime to one generated major and its Hey API client. Called by the generated `v<n>/client.ts`. */
 export function createHeyApiAware<G extends string, F extends string>(meta: HeyApiMeta, client: HeyApiClient): HeyApiAware<G, F> {
-  const bindings = createBindings<HeyApiClient, HeyApi, G, F>(meta, {
-    connect(opts) {
-      connectClient(client, opts);
-      return client;
-    },
-    listen: listenClient,
-    build: (compat) => buildHeyApi(meta, compat),
-  });
+  // One interceptor for the client's lifetime, registered on first connect: it forwards X-Api-Version and
+  // Sunset to the provider that connected last (a provider remount or StrictMode leaves no extra one).
+  let headers: ApiHeaderHandlers = {};
+  let listening = false;
+  const connect = (opts: { baseUrl: string; fetch?: typeof globalThis.fetch }, handlers: ApiHeaderHandlers = {}): HeyApiClient => {
+    headers = handlers;
+    if (!listening) {
+      listening = true;
+      client.interceptors.response.use((response) => {
+        readApiHeaders(response, headers);
+        return response;
+      });
+    }
+    connectClient(client, opts);
+    return client;
+  };
+
+  const bindings = createBindings<HeyApiClient, HeyApi, G, F>(meta, { connect, build: (compat) => buildHeyApi(meta, compat) });
 
   async function createApi(opts: CreateHeyApiOptions): Promise<HeyApi> {
     const compat = resolveCompat(await fetchBackendVersion(opts.baseUrl, opts.fetch), { [meta.major]: meta }, opts);
     if (compat.status !== "ok") throw new Error(`Unsupported backend: ${compat.status} (${compat.version})`);
-    connectClient(client, opts);
+    connect(opts);
     return buildHeyApi(meta, compat);
   }
 

@@ -41,14 +41,11 @@ depends = ["codegen:playground", "codegen:test"]
 depends = ["codegen"]
 run = "pnpm typecheck:tsc"
 # The Hey API output and runtime on the oldest and newest TypeScript we support (ADR 0027, #126).
-# Each version is fetched by pnpm dlx; the main typecheck uses the repo's TypeScript.
+# Both are devDependencies under aliases (typescript-5.5, typescript-7.0); the main typecheck uses the repo's TypeScript.
 [tasks."typecheck:hey-api"]
 description = "Typecheck the Hey API fixture and runtime on TS 5.5 and 7.0"
 depends = ["codegen:test"]
-run = [
-  "pnpm --silent --package=typescript@~5.5 dlx tsc -p test/tsconfig.hey-api.json",
-  "pnpm --silent --package=typescript@~7.0 dlx tsc -p test/tsconfig.hey-api.json",
-]
+run = "pnpm typecheck:hey-api"
 [tasks.test]
 depends = ["codegen:test"]
 run = "pnpm test:run"

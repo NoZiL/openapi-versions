@@ -59,8 +59,8 @@ function setup(version: string, id = "1", opts: { sunset?: string; strict?: bool
       </ApiVersionProvider>
     </QueryClientProvider>
   );
-  const view = render(opts.strict ? <StrictMode>{tree}</StrictMode> : tree);
-  return { backend, qc, view };
+  render(opts.strict ? <StrictMode>{tree}</StrictMode> : tree);
+  return { backend, qc };
 }
 
 /** Response interceptors registered on the generated client, ejected ones excluded. */
@@ -104,17 +104,51 @@ describe("Hey API runtime against different backends", () => {
     await screen.findByText("sunset 2027-01-31");
   });
 
-  it("leaves one interceptor under StrictMode, and none after unmount", async () => {
-    const before = interceptors();
-    const { view } = setup("1.6.0", "1", { strict: true, sunset: "2027-01-31T00:00:00Z" });
+  it("registers one interceptor for good: StrictMode and remounts add none", async () => {
+    setup("1.6.0");
+    await screen.findByText("Ada Lovelace");
+    const after = interceptors();
+    cleanup();
+    setup("1.6.0", "1", { strict: true, sunset: "2027-01-31T00:00:00Z" });
     await screen.findByText("sunset 2027-01-31");
-    expect(interceptors()).toBe(before + 1);
-    view.unmount();
-    expect(interceptors()).toBe(before);
+    expect(interceptors()).toBe(after);
+  });
+
+  it("reads headers on the first requests of a provider mounted with the version already cached", async () => {
+    const { qc } = setup("1.6.0");
+    await screen.findByText("Ada Lovelace");
+    cleanup();
+    const backend = createMockBackend("1.6.0", { sunset: "2027-01-31T00:00:00Z" });
+    render(
+      <QueryClientProvider client={qc}>
+        <ApiVersionProvider baseUrl="http://api.test" fetch={backend.fetch}>
+          <UserCard id="1" />
+        </ApiVersionProvider>
+      </QueryClientProvider>,
+    );
+    await screen.findByText("sunset 2027-01-31");
+    expect(backend.calls).not.toContain("GET /version"); // children rendered on the first commit
   });
 });
 
 describe("Hey API runtime without React", () => {
+  it("createApi without fetch drops a fetch passed earlier", async () => {
+    await createApi({ baseUrl: "http://api.test", fetch: createMockBackend("1.6.0").fetch });
+    const real = globalThis.fetch;
+    const seen: string[] = [];
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      seen.push(String(input instanceof Request ? input.url : input));
+      return Response.json({ version: "1.6.0" });
+    }) as typeof fetch;
+    try {
+      await createApi({ baseUrl: "http://other.test" });
+      await $api.getUser({ path: { id: "1" } });
+    } finally {
+      globalThis.fetch = real;
+    }
+    expect(seen).toEqual(["http://other.test/version", "http://other.test/users/1"]);
+  });
+
   it("createApi: gate() on query keys built by Hey API", async () => {
     const backend = createMockBackend("1.5.0");
     const { compat, gate } = await createApi({ baseUrl: "http://api.test", fetch: backend.fetch });
