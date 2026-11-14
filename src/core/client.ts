@@ -10,8 +10,9 @@
  */
 import createFetchClient, { type Client, type Middleware } from "openapi-fetch";
 import type { StripOps } from "./types";
+import { type ApiHeaderHandlers, readApiHeaders } from "./version";
 
-export const VERSION_HEADER = "x-api-version";
+export { type ApiHeaderHandlers, fetchBackendVersion, SUNSET_HEADER, VERSION_HEADER } from "./version";
 
 /** `P` = generated `paths`, `G` = union of gated operation keys */
 export type CorePaths<P extends {}, G extends string> = StripOps<P, G>;
@@ -20,24 +21,11 @@ export interface ApiClient<P extends {}, G extends string> {
   gated: Client<P>;
 }
 
-export const SUNSET_HEADER = "sunset"; // RFC 8594: when this API (major) stops being served
-
-export interface ApiHeaderHandlers {
-  onVersionHeader?: (version: string) => void;
-  onSunsetHeader?: (sunset: Date) => void;
-}
-
 /** Reads X-Api-Version (deploys mid-session) and Sunset (major being retired) on every response. */
-export function apiHeadersMiddleware({ onVersionHeader, onSunsetHeader }: ApiHeaderHandlers): Middleware {
+export function apiHeadersMiddleware(handlers: ApiHeaderHandlers): Middleware {
   return {
     onResponse({ response }) {
-      const v = response.headers.get(VERSION_HEADER);
-      if (v && onVersionHeader) onVersionHeader(v);
-      const sunset = response.headers.get(SUNSET_HEADER);
-      if (sunset && onSunsetHeader) {
-        const d = new Date(sunset);
-        if (!Number.isNaN(d.getTime())) onSunsetHeader(d);
-      }
+      readApiHeaders(response, handlers);
       return undefined;
     },
   };
@@ -53,14 +41,4 @@ export function createApiClient<P extends {}, G extends string>(
   const c = createFetchClient<P>({ baseUrl: opts.baseUrl, fetch: opts.fetch });
   if (opts.onVersionHeader || opts.onSunsetHeader) c.use(apiHeadersMiddleware(opts));
   return { core: c as unknown as Client<CorePaths<P, G>>, gated: c };
-}
-
-/** GET {baseUrl}/version, e.g. https://host/api/v1/version. Resolved RELATIVE to the base path. */
-export async function fetchBackendVersion(baseUrl: string, fetchImpl: typeof fetch = fetch): Promise<string> {
-  const base = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
-  const res = await fetchImpl(new URL("version", base));
-  if (!res.ok) throw new Error(`GET /version failed: ${res.status}`);
-  const body = (await res.json()) as { version?: unknown };
-  if (typeof body.version !== "string") throw new Error("GET /version: missing `version` string");
-  return body.version;
 }

@@ -34,6 +34,7 @@ Exit code 1 on: invalid config, no generator installed (or the configured one mi
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
 | `openapi-versions`             | Runtime: `createVersionAware(meta)` (core + React), plus the core exports                                                      |
 | `openapi-versions/core`        | Framework-free runtime: `resolveCompat`, `createApi`, `createApiClient`, `fetchBackendVersion`, `createVersionAwareCore(meta)` |
+| `openapi-versions/hey-api`     | Runtime of the Hey API stack: `createHeyApiAware(meta, client)` (what the generated `client.ts` calls), `connectClient`, `listenClient`, `buildHeyApi`, and the `HeyApi`, `HeyApiMeta`, `HeyApiClient`, `Gated` types. Hey API's client is module-level, so the provider and `createApi` re-point it for the whole app (one provider per app, and not for concurrent server-side renders with per-user `fetch`). Needs only `@tanstack/react-query` and `react` |
 | `openapi-versions/codegen`     | Programmatic codegen API                                                                                                       |
 | `openapi-versions/schema.json` | JSON Schema of the config                                                                                                      |
 | `npx openapi-versions`         | The CLI                                                                                                                        |

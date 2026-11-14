@@ -9,6 +9,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { createMockBackend, sideBySide } from "../playground/api/mock-backend";
 import { fetchBackendVersion } from "../src/core/client";
+import { API_VERSION_KEY } from "../src/react/bindings";
 import { ApiVersionProvider, createApi, useApi, useSunset } from "./fixtures/generated/v1/client";
 
 const SUNSET = "2027-03-01T00:00:00Z";
@@ -31,9 +32,9 @@ function UserName() {
   );
 }
 
-function mount(baseUrl: string, fetchImpl: typeof fetch) {
+function mount(baseUrl: string, fetchImpl: typeof fetch, qc = new QueryClient({ defaultOptions: { queries: { retry: false } } })) {
   render(
-    <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <QueryClientProvider client={qc}>
       <ApiVersionProvider baseUrl={baseUrl} fetch={fetchImpl}>
         <UserName />
       </ApiVersionProvider>
@@ -57,6 +58,16 @@ describe("major transition, majors served side by side", () => {
     expect((await screen.findByRole("alert")).textContent).toContain("2027-03-01");
     expect(s.v1.calls).toContain("GET /users/1");
     expect(s.v2.calls).toHaveLength(0);
+  });
+
+  it("reads Sunset on the first requests of a provider mounted with the version already cached", async () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    qc.setQueryData(API_VERSION_KEY, "1.9.2"); // remount or hydration: children render on the first commit
+    const s = server();
+    mount("http://api.test/api/v1", s.fetch, qc);
+    await screen.findByText("Ada Lovelace");
+    expect((await screen.findByRole("alert")).textContent).toContain("2027-03-01");
+    expect(s.v1.calls).not.toContain("GET /version");
   });
 
   it("the same 1.x app pointed at /api/v2 is blocked: v2 needs a new app release", async () => {
