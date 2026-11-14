@@ -8,7 +8,7 @@
  */
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { createContext, type JSX, type ReactNode, useContext, useMemo, useRef, useState } from "react";
+import { createContext, type JSX, type ReactNode, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { type Compat, type CompatOptions, type MajorMeta, type OkCompat, resolveCompat } from "../core/compat";
 import { type ApiHeaderHandlers, fetchBackendVersion } from "../core/version";
 
@@ -37,9 +37,15 @@ export interface Transport<C, A extends { compat: OkCompat }> {
   /**
    * Called during render, again only when `baseUrl` or `fetch` change: children start their queries in
    * their own effects, which run before the provider's, so the client must be ready, and read headers,
-   * by then. `headers` is stable: it calls the current provider's handlers.
+   * by then. `headers` is stable for the provider's lifetime (one object per QueryClient).
    */
   connect(opts: { baseUrl: string; fetch?: typeof globalThis.fetch }, headers: ApiHeaderHandlers): C;
+  /**
+   * For a client shared beyond one provider (Hey API's module-level client): called in an effect, returns
+   * the cleanup, so unmounting stops this provider's handlers. Only for clients that read their listeners
+   * when a response arrives; one that copies them per request must take `headers` in `connect`.
+   */
+  listen?(client: C, headers: ApiHeaderHandlers): () => void;
   /** The object `useApi()` returns for one resolved backend version. */
   build(compat: OkCompat, client: C): A;
 }
@@ -112,6 +118,7 @@ export function createBindings<C, A extends { compat: OkCompat }, G extends stri
       [queryClient],
     );
     const client = useMemo(() => transport.connect({ baseUrl, fetch: fetchImpl }, headers), [baseUrl, fetchImpl, headers]);
+    useEffect(() => transport.listen?.(client, headers), [client, headers]);
 
     const version = useQuery({
       queryKey: API_VERSION_KEY,

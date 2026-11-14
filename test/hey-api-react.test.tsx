@@ -8,6 +8,7 @@ import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { StrictMode } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { createMockBackend } from "../playground/api/mock-backend";
+import { connectClient, type HeyApiClient } from "../src/hey-api";
 import { $api, $gated, ApiVersionProvider, createApi, Feature, type User, useApi, useSunset } from "./fixtures/generated/hey-api/v1/client";
 import { client } from "./fixtures/generated/hey-api/v1/sdk/client.gen";
 
@@ -104,6 +105,24 @@ describe("Hey API runtime against different backends", () => {
     await screen.findByText("sunset 2027-01-31");
   });
 
+  it("keeps reading headers after a loader calls createApi, and after a nested provider unmounts", async () => {
+    const { backend, qc } = setup("1.4.0");
+    await screen.findByText("Ada Lovelace");
+    await createApi({ baseUrl: "http://api.test", fetch: backend.fetch });
+    const nested = render(
+      <QueryClientProvider client={new QueryClient()}>
+        <ApiVersionProvider baseUrl="http://api.test" fetch={backend.fetch}>
+          <p>nested</p>
+        </ApiVersionProvider>
+      </QueryClientProvider>,
+    );
+    await screen.findByText("nested");
+    nested.unmount();
+    backend.deploy("1.6.0");
+    await act(() => qc.refetchQueries({ predicate: (q) => q.queryKey[0] !== "api-version" }));
+    await screen.findByText("Archive");
+  });
+
   it("registers one interceptor for good: StrictMode and remounts add none", async () => {
     setup("1.6.0");
     await screen.findByText("Ada Lovelace");
@@ -161,7 +180,22 @@ describe("Hey API runtime without React", () => {
 
   it("gate() refuses an operation id codegen did not write", async () => {
     const { gate } = await createApi({ baseUrl: "http://api.test", fetch: createMockBackend("1.6.0").fetch });
-    expect(() => gate({ queryKey: [{ _id: "notAnOperation" }] })).toThrow(/unknown Hey API operation "notAnOperation"/);
+    for (const id of ["notAnOperation", "toString"])
+      expect(() => gate({ queryKey: [{ _id: id }] })).toThrow(`unknown Hey API operation "${id}"`);
+  });
+
+  it("keeps the fetch the app configured on the client when none is given", () => {
+    const appFetch = (async () => Response.json({})) as typeof fetch;
+    let config: { baseUrl?: string; fetch?: typeof fetch } = { fetch: appFetch };
+    const fake: HeyApiClient = {
+      getConfig: () => config,
+      setConfig: (c) => (config = { ...config, ...c }),
+      interceptors: { response: { use: () => 0 } },
+    };
+    connectClient(fake, { baseUrl: "http://a.test", fetch: createMockBackend("1.6.0").fetch });
+    expect(config.fetch).not.toBe(appFetch);
+    connectClient(fake, { baseUrl: "http://b.test" });
+    expect(config).toEqual({ baseUrl: "http://b.test", fetch: appFetch });
   });
 
   it("imports no openapi-fetch or openapi-react-query (only peer: @tanstack/react-query)", () => {
