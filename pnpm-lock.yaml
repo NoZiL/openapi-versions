@@ -213,8 +213,8 @@ importers:
         specifier: ^0.5.4
         version: 0.5.4(@tanstack/react-query@5.107.1(@types/react@19.3.0)(react@19.3.1))(openapi-fetch@0.17.0)
       openapi-typesafe:
-        specifier: 1.0.0-rc.5
-        version: 1.0.0-rc.5(typescript@5.9.3)
+        specifier: 1.0.0-rc.6
+        version: 1.0.0-rc.6(typescript@5.9.3)
       openapi-typescript:
         specifier: ^7.13.0
         version: 7.13.0(typescript@5.9.3)
@@ -1388,8 +1388,8 @@ packages:
       '@tanstack/react-query': ^5.80.0
       openapi-fetch: ^0.17.0
 
-  openapi-typesafe@1.0.0-rc.5:
-    resolution: {integrity: sha512-i4xarJNX0DLXBpyMuh2oVd6UfhBsueBgwuhzPEpyiqBxJe/AIaUC2PN9hAndf7h8i/9X7LwtdIKIzr6JO2d2IQ==}
+  openapi-typesafe@1.0.0-rc.6:
+    resolution: {integrity: sha512-1q/tr7xDweqaLUFI8nGoa2v33XfhtMxiY8dQGV3A+GuNFqxHziHZ/fJ5qJPewEYLqCnPuUA1OV4yTyH3cIDuOA==}
     engines: {node: '>=22.12.0'}
     hasBin: true
     peerDependencies:
@@ -2802,7 +2802,7 @@ snapshots:
       openapi-fetch: 0.17.0
       openapi-typescript-helpers: 0.1.0(patch_hash=5d7ef7035643499f6d289d8516a7d38e465b298852b0e877ca5603edfcf1a1a7)
 
-  openapi-typesafe@1.0.0-rc.5(typescript@5.9.3):
+  openapi-typesafe@1.0.0-rc.6(typescript@5.9.3):
     dependencies:
       '@redocly/openapi-core': 1.34.22(supports-color@11.0.0)
       ansi-colors: 4.1.3
