@@ -20,21 +20,21 @@ url_api = "https://api.github.com/repos/rhysd/actionlint/releases/assets/3849248
 provenance = "github-attestations"
 
 [[tools."github:oasdiff/oasdiff"]]
-version = "1.37.0"
+version = "1.40.0"
 backend = "github:oasdiff/oasdiff"
-specifiers = ["v1.37.0"]
+specifiers = ["v1.40.0"]
 
 [tools."github:oasdiff/oasdiff"."platforms.linux-x64"]
-checksum = "sha256:eac87307d31d08c36800c58a409c247f1c5db37fbb72e2544402f22a87cbca3c"
+checksum = "sha256:2d04b8f41b145809dd554e9be9ca04d21d1b4eedad5af983ddea36832d3c5e0d"
 checksum_source = "mise-versions"
-url = "https://github.com/oasdiff/oasdiff/releases/download/v1.37.0/oasdiff_1.37.0_linux_amd64.tar.gz"
-url_api = "https://api.github.com/repos/oasdiff/oasdiff/releases/assets/724875877"
+url = "https://github.com/oasdiff/oasdiff/releases/download/v1.40.0/oasdiff_1.40.0_linux_amd64.tar.gz"
+url_api = "https://api.github.com/repos/oasdiff/oasdiff/releases/assets/790565307"
 
 [tools."github:oasdiff/oasdiff"."platforms.macos-arm64"]
-checksum = "sha256:eccf5b9f46e689f8adcd79b79d4fdbde26a28301b6a74a0b449ad6a49e187e45"
+checksum = "sha256:26adff8a656c0c021f85595f764dac61a59ff9b5c072f4797a2e8e161cf87533"
 checksum_source = "mise-versions"
-url = "https://github.com/oasdiff/oasdiff/releases/download/v1.37.0/oasdiff_1.37.0_darwin_all.tar.gz"
-url_api = "https://api.github.com/repos/oasdiff/oasdiff/releases/assets/724875920"
+url = "https://github.com/oasdiff/oasdiff/releases/download/v1.40.0/oasdiff_1.40.0_darwin_all.tar.gz"
+url_api = "https://api.github.com/repos/oasdiff/oasdiff/releases/assets/790565395"
 
 [[tools.jq]]
 version = "1.8.2"
